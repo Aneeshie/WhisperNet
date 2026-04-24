@@ -1,4 +1,4 @@
-import { joinRoom } from "trystero";
+import { joinRoom } from "trystero/nostr";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useUIStore } from "@/store";
@@ -10,8 +10,6 @@ let room: any = null;
 
 // Actions
 let broadcastAction: any = null;
-let syncRequestAction: any = null;
-let syncResponseAction: any = null;
 
 export function initMesh() {
   if (room) return;
@@ -23,8 +21,6 @@ export function initMesh() {
   const [sendSyncRes, getSyncRes] = room.makeAction("sync_res");
 
   broadcastAction = sendBroadcast;
-  syncRequestAction = sendSyncReq;
-  syncResponseAction = sendSyncRes;
 
   room.onPeerJoin((peerId: string) => {
     console.log(`[Mesh] Peer joined: ${peerId}`);
@@ -49,7 +45,7 @@ export function initMesh() {
   });
 
   // Handle sync requests: send all our messages back to the requesting peer
-  getSyncReq(async (data: any, peerId: string) => {
+  getSyncReq(async (_data: any, peerId: string) => {
     console.log(`[Mesh] Sync request from ${peerId}`);
     const myMessages = await getMessages();
     sendSyncRes(myMessages, peerId);

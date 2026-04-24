@@ -4,7 +4,7 @@ import { Clock, Navigation, AlertTriangle, Info } from "lucide-react";
 import type { Message } from "@/types/message";
 
 export default function Feed() {
-  const { messages, fetchMessages } = useUIStore();
+  const { messages, fetchMessages, peerCount } = useUIStore();
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -72,8 +72,8 @@ export default function Feed() {
       <header className="py-4 border-b border-zinc-900">
         <h1 className="text-xl font-bold tracking-tight">WhisperNet Feed</h1>
 
-        <p className="text-xs font-mono text-zinc-500 mt-1">
-          NODE_STATUS: OFFLINE_MESH | MSGS: {messages.length}
+        <p className={`text-xs font-mono mt-1 ${peerCount > 0 ? "text-green-500" : "text-zinc-500"}`}>
+          NODE_STATUS: {peerCount > 0 ? `ONLINE_MESH (${peerCount} PEERS)` : "OFFLINE_MESH"} | MSGS: {messages.length}
         </p>
       </header>
 

@@ -1,12 +1,19 @@
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
+import { useEffect } from "react";
 import BottomNav from "@/components/BottomNav";
 import Feed from "@/pages/Feed";
 import Alert from "@/pages/Alert";
 import Scan from "@/pages/Scan";
 import Settings from "@/pages/Settings";
+import { initMesh, leaveMesh } from "@/sync/mesh";
 
 export default function App() {
+  useEffect(() => {
+    initMesh();
+    return () => leaveMesh();
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-black text-zinc-50 font-sans selection:bg-zinc-800">
       <Toaster theme="dark" position="top-center" />
