@@ -2,6 +2,7 @@ import { v4 as uuid } from "uuid";
 import type { Message, MessageType, Priority } from "../types/message";
 import { createMessage } from "../db/messages";
 import { db } from "@/db/db";
+import { chooseWinningMessage } from "./conflict";
 
 type GenerateMessageInput = {
   type: MessageType;
@@ -53,4 +54,19 @@ export async function updateExistingMessage(
   await db.messages.put(updated);
 
   return updated;
+}
+
+export async function mergeIncomingMessage(incoming: Message) {
+  const local = await db.messages.get(incoming.id);
+
+  if (!local) {
+    await db.messages.put(incoming);
+    return incoming;
+  }
+
+  const winner = chooseWinningMessage(local, incoming);
+
+  await db.messages.put(winner);
+
+  return winner;
 }
