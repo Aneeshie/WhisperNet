@@ -1,5 +1,5 @@
 function App() {
-  return <div>Hello WhisperNet</div>;
+  return <div>whisperNet</div>;
 }
 
 export default App;
