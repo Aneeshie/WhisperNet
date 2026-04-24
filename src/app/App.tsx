@@ -1,3 +1,4 @@
+
 import { Routes, Route } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import Feed from "@/pages/Feed";
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
+
 
       {/* Persistent Bottom Navigation */}
       <BottomNav />
