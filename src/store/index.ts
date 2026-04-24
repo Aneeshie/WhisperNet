@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { toast } from 'sonner';
-import type { Message } from '@/types/message';
-import { createMessage, getMessages } from '@/db/messages';
+import { create } from "zustand";
+import { toast } from "sonner";
+import type { Message } from "@/types/message";
+import { createMessage, getMessages } from "@/db/messages";
 
 interface UIState {
   isNavigating: boolean;
@@ -28,7 +28,7 @@ export const useUIStore = create<UIState>((set) => ({
     try {
       await createMessage(msg);
       toast.success("Message persisted to local mesh DB");
-      
+
       // Re-fetch to ensure store and DB are perfectly in sync
       const dbMessages = await getMessages();
       set({ messages: dbMessages });
@@ -36,5 +36,5 @@ export const useUIStore = create<UIState>((set) => ({
       console.error("Failed to save message to DB:", error);
       toast.error("Database Error: Failed to save message");
     }
-  }
+  },
 }));
