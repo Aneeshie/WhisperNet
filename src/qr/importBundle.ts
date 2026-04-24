@@ -1,8 +1,15 @@
 import type { QRBundle } from "./schema";
 import { mergeIncomingMessage } from "../sync/messageEngine";
+import LZString from "lz-string";
 
 export async function importBundle(payload: string) {
-  const bundle = JSON.parse(payload) as QRBundle;
+  const decompressed = LZString.decompressFromBase64(payload);
+  
+  if (!decompressed) {
+    throw new Error("Failed to decompress QR payload");
+  }
+
+  const bundle = JSON.parse(decompressed) as QRBundle;
 
   if (bundle.version !== 1) {
     throw new Error("Unsupported bundle version");

@@ -15,7 +15,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/alert" element={<Alert />} />
-          <Route path="/scan" element={<Scan />} />
+          <Route path="/scan/*" element={<Scan />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
