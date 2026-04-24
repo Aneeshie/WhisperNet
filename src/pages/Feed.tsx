@@ -1,9 +1,14 @@
+import { useEffect } from "react";
 import { useUIStore } from "@/store";
 import { Clock, Navigation, AlertTriangle, Info } from "lucide-react";
 import type { Message } from "@/types/message";
 
 export default function Feed() {
-  const { messages } = useUIStore();
+  const { messages, fetchMessages } = useUIStore();
+
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   const getMessageConfig = (type: string) => {
     switch (type) {

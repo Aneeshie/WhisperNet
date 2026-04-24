@@ -20,7 +20,7 @@ export default function Alert() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!content.trim()) return;
 
     const now = Date.now();
@@ -40,7 +40,8 @@ export default function Alert() {
       trusted: true
     };
 
-    addMessage(newMessage);
+    await addMessage(newMessage);
+    setContent(""); // Clear form on success
     navigate("/"); // Redirect to feed to see it immediately
   };
 
