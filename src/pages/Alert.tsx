@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useMessageStore } from "@/store";
 import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType, Priority } from "@/types/message";
+import { AlertTriangle, Map, Radio, Package, type LucideIcon } from "lucide-react";
 
-const MESSAGE_TYPES: { value: MessageType; label: string; emoji: string }[] = [
-  { value: "alert", label: "Alert", emoji: "🚨" },
-  { value: "route", label: "Route", emoji: "🗺️" },
-  { value: "news", label: "News", emoji: "📰" },
-  { value: "resource", label: "Resource", emoji: "📦" },
+const MESSAGE_TYPES: { value: MessageType; label: string; icon: LucideIcon }[] = [
+  { value: "alert", label: "Alert", icon: AlertTriangle },
+  { value: "route", label: "Route", icon: Map },
+  { value: "news", label: "News", icon: Radio },
+  { value: "resource", label: "Resource", icon: Package },
 ];
 
 const TTL_OPTIONS = [
@@ -81,7 +82,7 @@ export default function Alert() {
                     : "border-white/5 bg-white/3 text-zinc-500 hover:bg-white/5"
                 }`}
               >
-                <span className="text-lg">{t.emoji}</span>
+                <t.icon className="w-5 h-5 mb-0.5" />
                 <span className="text-[11px] font-medium">{t.label}</span>
               </button>
             ))}

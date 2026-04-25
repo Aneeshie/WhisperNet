@@ -7,6 +7,18 @@ import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType } from "@/types/message";
 import { Smartphone, Trash2, Sparkles, Clock, ChevronRight } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 export default function Settings() {
   const { isNavigating, setNavigating } = useUIStore();
   const { fetchMessages } = useMessageStore();
@@ -72,10 +84,10 @@ export default function Settings() {
         id: `msg_${uuidv4().substring(0, 8)}`,
         type: "news",
         priority: "low",
-        content: `Short TTL test message (Expires in 1 min).`,
+        content: `Short TTL test message (Expires in 30 secs).`,
         createdAt: now,
         updatedAt: now,
-        expiresAt: now + 60000,
+        expiresAt: now + 30000,
         version: 1,
         hopCount: 0,
         maxHopCount: 10,
@@ -83,24 +95,12 @@ export default function Settings() {
       };
       await createMessage(msg);
       await fetchMessages();
-      toast.success("1 min TTL message generated");
+      toast.success("30 sec TTL message generated");
     } catch (error) {
       console.error("handleGenerateShortTTLMessage error:", error);
       toast.error("Failed to generate TTL message");
     }
   };
-
-  const handleClearDatabase = async () => {
-    try {
-      await db.messages.clear();
-      await fetchMessages();
-      toast.warning("All messages deleted");
-    } catch (error) {
-      console.error("handleClearDatabase error:", error);
-      toast.error("Failed to clear database");
-    }
-  };
-
   const handleTTL = async () => {
     try {
       await deleteExpiredMessages();
@@ -109,6 +109,27 @@ export default function Settings() {
     } catch (error) {
       console.error("handleTTL error:", error);
       toast.error("Failed to clean up");
+    }
+  };
+
+  const handleEmergencyWipe = async () => {
+    try {
+      // 1. Wipe DB
+      await db.messages.clear();
+      
+      // 2. Unregister service workers
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      
+      // 3. Reload window to clear memory and states
+      window.location.reload();
+    } catch (error) {
+      console.error("handleEmergencyWipe error:", error);
+      toast.error("Emergency wipe failed");
     }
   };
 
@@ -188,25 +209,49 @@ export default function Settings() {
                 <Clock className="w-4 h-4 text-zinc-500" />
                 Clean up expired messages
               </button>
-
               <button
                 onClick={handleGenerateShortTTLMessage}
                 className="w-full p-4 text-left text-sm text-zinc-300 hover:bg-white/3 transition-colors flex items-center gap-3"
               >
                 <Clock className="w-4 h-4 text-zinc-500" />
-                Generate 1-min TTL message
-              </button>
-
-              <button
-                onClick={handleClearDatabase}
-                className="w-full p-4 text-left text-sm text-red-400/80 hover:bg-red-500/5 transition-colors flex items-center gap-3"
-              >
-                <Trash2 className="w-4 h-4 text-red-500/60" />
-                Delete all messages
+                Generate 30-sec TTL message
               </button>
             </div>
           </div>
         )}
+
+        {/* Security / Danger Zone */}
+        <div className="space-y-2 animate-fade-in-up mt-8">
+          <h2 className="text-xs font-medium text-red-500/80 uppercase tracking-wider px-1 flex items-center gap-1.5">
+            <Trash2 className="w-3.5 h-3.5" />
+            Danger Zone
+          </h2>
+          <div className="glass-card overflow-hidden border-red-500/20">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="w-full p-4 text-left text-sm text-red-400 font-medium hover:bg-red-500/10 transition-colors flex items-center gap-3">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                  Emergency Wipe
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-zinc-950 border border-red-500/30 text-zinc-100 max-w-sm rounded-xl">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-red-500">Emergency Wipe Data?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-zinc-400">
+                    This action cannot be undone. This will instantly destroy all local databases, messages, and configurations, and unregister the offline service worker.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-100 rounded-lg">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleEmergencyWipe} className="bg-red-500 hover:bg-red-600 text-white rounded-lg">
+                    Nuke Everything
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+
       </div>
     </div>
   );
