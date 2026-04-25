@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Scanner } from "./Scanner";
 import { AnimatedQR } from "./AnimatedQR";
 import { generateHostOffer, processJoinerOfferAndGenerateAnswer, finalizeHostConnection } from "@/sync/offlineMesh";
-import { X, WifiOff } from "lucide-react";
+import { X, Wifi } from "lucide-react";
 
 export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"SELECT" | "HOST" | "JOIN">("SELECT");
@@ -22,7 +22,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
       setQrData(result.offer);
       setOfferId(result.offerId);
     } catch (e) {
-      setError("Failed to generate Host Offer");
+      setError("Failed to create connection code. Make sure Wi-Fi is enabled.");
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
       setQrData(answerStr);
       setStep(2);
     } catch (e) {
-      setError("Invalid Host QR Code");
+      setError("Couldn't read that QR code. Ask your friend to try again.");
     } finally {
       setLoading(false);
     }
@@ -53,105 +53,123 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
     setLoading(true);
     try {
       await finalizeHostConnection(scanned, offerId);
-      setStep(3); // Show a "waiting for tunnel" state
-      // Wait a bit for the ICE connection to establish, then close
+      setStep(3);
       setTimeout(() => {
         onClose();
       }, 4000);
     } catch (e) {
-      setError("Invalid Joiner QR Code");
+      setError("Couldn't read that QR code. Ask your friend to try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-md flex flex-col relative overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xl">
+      <div className="glass-card w-full max-w-md flex flex-col relative overflow-hidden shadow-2xl">
 
-        <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/20">
-          <div className="flex items-center space-x-2">
-            <WifiOff className="w-5 h-5 text-zinc-400" />
-            <h2 className="text-sm font-bold font-mono text-zinc-200">OFFLINE MESH HANDSHAKE</h2>
+        {/* Header */}
+        <div className="p-4 border-b border-white/5 flex justify-between items-center">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <Wifi className="w-4 h-4 text-blue-400" />
+            </div>
+            <h2 className="text-sm font-semibold text-zinc-200">Connect Nearby</h2>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-lg hover:bg-white/5">
             <X className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Content */}
         <div className="p-6 flex flex-col items-center min-h-[400px]">
           {error && (
-            <div className="mb-4 bg-red-950/50 border border-red-900 p-3 rounded text-xs text-red-500 font-mono w-full text-center">
+            <div className="mb-4 bg-red-500/10 border border-red-500/15 p-3 rounded-xl text-xs text-red-400 w-full text-center">
               {error}
             </div>
           )}
 
           {mode === "SELECT" && (
-            <div className="flex flex-col items-center justify-center space-y-6 w-full flex-1">
-              <p className="text-center text-xs text-zinc-400 font-mono px-4 leading-relaxed">
-                Connect two devices instantly over local Wi-Fi without internet.
-                One device must Host, the other must Join.
-              </p>
+            <div className="flex flex-col items-center justify-center space-y-5 w-full flex-1">
+              <div className="text-center px-4">
+                <h3 className="text-lg font-semibold text-zinc-200 mb-2">Connect via Wi-Fi</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Both devices must be on the same Wi-Fi network. One shows a code, the other scans it.
+                </p>
+              </div>
 
-              <div className="flex flex-col w-full space-y-3 mt-4">
+              <div className="flex flex-col w-full space-y-2.5 mt-2">
                 <button
                   onClick={handleStartHost}
-                  className="bg-blue-900/80 hover:bg-blue-800 text-blue-100 py-4 rounded-lg font-mono text-sm tracking-widest font-bold transition-all border border-blue-800"
+                  className="py-4 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-sm font-medium transition-all"
                 >
-                  CREATE HOST
+                  Show My Code
                 </button>
                 <button
                   onClick={handleStartJoin}
-                  className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-4 rounded-lg font-mono text-sm tracking-widest font-bold transition-all border border-zinc-700"
+                  className="py-4 rounded-xl bg-white/5 hover:bg-white/8 text-zinc-300 text-sm font-medium transition-all"
                 >
-                  JOIN MESH
+                  Scan Friend's Code
                 </button>
               </div>
             </div>
           )}
 
           {mode === "HOST" && (
-            <div className="flex flex-col items-center w-full space-y-6">
-              <div className="flex items-center justify-between w-full px-4 mb-2">
-                <span className={`text-xs font-mono font-bold ${step === 1 ? 'text-blue-400' : 'text-zinc-600'}`}>1. SHOW OFFER</span>
-                <span className={`text-xs font-mono font-bold ${step === 2 ? 'text-blue-400' : 'text-zinc-600'}`}>2. SCAN ANSWER</span>
+            <div className="flex flex-col items-center w-full space-y-5">
+              {/* Step indicators */}
+              <div className="flex items-center gap-3 w-full px-2">
+                <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-blue-400' : 'text-zinc-600'}`}>
+                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${step >= 1 ? 'bg-blue-500/20' : 'bg-white/5'}`}>1</span>
+                  <span className="text-xs font-medium">Show code</span>
+                </div>
+                <div className="flex-1 h-px bg-white/10" />
+                <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-blue-400' : 'text-zinc-600'}`}>
+                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${step >= 2 ? 'bg-blue-500/20' : 'bg-white/5'}`}>2</span>
+                  <span className="text-xs font-medium">Scan response</span>
+                </div>
               </div>
 
               {step === 1 && (
                 <>
                   {loading || !qrData ? (
-                    <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
-                      <p className="text-xs font-mono text-zinc-500 animate-pulse">GENERATING OFFER...</p>
+                    <div className="w-72 h-72 rounded-2xl bg-white/3 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs text-zinc-500">Creating connection code...</p>
+                      </div>
                     </div>
                   ) : (
                     <AnimatedQR payload={qrData} />
                   )}
-                  <p className="text-xs text-center text-zinc-400 font-mono mt-4">
-                    Have the other device scan this animated QR sequence to initiate the handshake.
+                  <p className="text-xs text-zinc-500 text-center">
+                    Show this to your friend and ask them to scan it
                   </p>
                   <button
                     onClick={() => setStep(2)}
                     disabled={!qrData}
-                    className="w-full bg-blue-900/80 hover:bg-blue-800 text-blue-100 py-3 rounded-lg font-mono text-xs tracking-widest font-bold disabled:opacity-50 mt-4"
+                    className="w-full py-3 rounded-xl bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-sm font-medium disabled:opacity-30 transition-all"
                   >
-                    NEXT: SCAN THEIR ANSWER
+                    They scanned it — next step
                   </button>
                 </>
               )}
 
               {step === 2 && (
                 <div className="flex flex-col items-center space-y-4">
+                  <p className="text-xs text-zinc-500 text-center mb-2">
+                    Now scan the code your friend is showing you
+                  </p>
                   <Scanner onScan={handleHostScan} />
                 </div>
               )}
 
               {step === 3 && (
                 <div className="flex flex-col items-center justify-center space-y-4 py-12">
-                  <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
-                  <h3 className="text-sm font-bold text-green-400 font-mono tracking-wide">ESTABLISHING TUNNEL...</h3>
-                  <p className="text-xs text-zinc-400 font-mono text-center leading-relaxed px-4">
-                    SDP exchange complete. Waiting for the local Wi-Fi tunnel to connect.
-                    Check the toast notifications for status updates.
+                  <div className="w-14 h-14 border-3 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                  <h3 className="text-base font-semibold text-emerald-300">Connecting...</h3>
+                  <p className="text-xs text-zinc-500 text-center leading-relaxed px-4">
+                    Setting up the local Wi-Fi tunnel. This only takes a few seconds.
                   </p>
                 </div>
               )}
@@ -159,14 +177,25 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
           )}
 
           {mode === "JOIN" && (
-            <div className="flex flex-col items-center w-full space-y-6">
-              <div className="flex items-center justify-between w-full px-4 mb-2">
-                <span className={`text-xs font-mono font-bold ${step === 1 ? 'text-blue-400' : 'text-zinc-600'}`}>1. SCAN HOST</span>
-                <span className={`text-xs font-mono font-bold ${step === 2 ? 'text-blue-400' : 'text-zinc-600'}`}>2. SHOW ANSWER</span>
+            <div className="flex flex-col items-center w-full space-y-5">
+              {/* Step indicators */}
+              <div className="flex items-center gap-3 w-full px-2">
+                <div className={`flex items-center gap-1.5 ${step >= 1 ? 'text-blue-400' : 'text-zinc-600'}`}>
+                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${step >= 1 ? 'bg-blue-500/20' : 'bg-white/5'}`}>1</span>
+                  <span className="text-xs font-medium">Scan code</span>
+                </div>
+                <div className="flex-1 h-px bg-white/10" />
+                <div className={`flex items-center gap-1.5 ${step >= 2 ? 'text-blue-400' : 'text-zinc-600'}`}>
+                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center ${step >= 2 ? 'bg-blue-500/20' : 'bg-white/5'}`}>2</span>
+                  <span className="text-xs font-medium">Show response</span>
+                </div>
               </div>
 
               {step === 1 && (
                 <div className="flex flex-col items-center space-y-4">
+                  <p className="text-xs text-zinc-500 text-center mb-2">
+                    Scan the code your friend is showing you
+                  </p>
                   <Scanner onScan={handleJoinScan} />
                 </div>
               )}
@@ -174,14 +203,17 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
               {step === 2 && (
                 <>
                   {loading || !qrData ? (
-                    <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
-                      <p className="text-xs font-mono text-zinc-500 animate-pulse">GENERATING ANSWER...</p>
+                    <div className="w-72 h-72 rounded-2xl bg-white/3 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-xs text-zinc-500">Creating response code...</p>
+                      </div>
                     </div>
                   ) : (
                     <AnimatedQR payload={qrData} />
                   )}
-                  <p className="text-xs text-center text-zinc-400 font-mono mt-4">
-                    Show this animated QR sequence back to the Host. Once scanned, the connection will be established!
+                  <p className="text-xs text-zinc-500 text-center">
+                    Now show this code back to your friend so they can scan it
                   </p>
                 </>
               )}
