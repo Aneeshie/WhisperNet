@@ -53,7 +53,11 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
     setLoading(true);
     try {
       await finalizeHostConnection(scanned, offerId);
-      onClose(); // Success!
+      setStep(3); // Show a "waiting for tunnel" state
+      // Wait a bit for the ICE connection to establish, then close
+      setTimeout(() => {
+        onClose();
+      }, 4000);
     } catch (e) {
       setError("Invalid Joiner QR Code");
     } finally {
@@ -138,6 +142,17 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
               {step === 2 && (
                 <div className="flex flex-col items-center space-y-4">
                   <Scanner onScan={handleHostScan} />
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="flex flex-col items-center justify-center space-y-4 py-12">
+                  <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+                  <h3 className="text-sm font-bold text-green-400 font-mono tracking-wide">ESTABLISHING TUNNEL...</h3>
+                  <p className="text-xs text-zinc-400 font-mono text-center leading-relaxed px-4">
+                    SDP exchange complete. Waiting for the local Wi-Fi tunnel to connect.
+                    Check the toast notifications for status updates.
+                  </p>
                 </div>
               )}
             </div>

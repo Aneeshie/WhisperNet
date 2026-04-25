@@ -35,12 +35,11 @@ const pendingConnections = new Map<string, { pc: RTCPeerConnection, dc: RTCDataC
 
 // Step 1: Host generates an Offer
 export async function generateHostOffer(): Promise<{ offer: string, offerId: string }> {
-  const pc = new RTCPeerConnection({ 
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" }
-    ]
-  });
+  // Use NO STUN servers. When offline, STUN is unreachable and some browsers
+  // will refuse to gather ANY candidates (including local ones) until the
+  // STUN request times out. With empty iceServers, the browser immediately
+  // gathers host candidates using the device's local network interfaces.
+  const pc = new RTCPeerConnection({ iceServers: [] });
   activeOfflinePCs.push(pc);
   
   const dc = pc.createDataChannel("offline-mesh");
@@ -48,16 +47,28 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
   const offerId = Math.random().toString(36).substring(2, 10);
   pendingConnections.set(offerId, { pc, dc });
 
+  let candidateCount = 0;
   pc.oniceconnectionstatechange = () => {
-    console.log(`[Offline Mesh Host] ICE state: ${pc.iceConnectionState}`);
+    console.log(`[Offline Mesh Host] ICE connection state: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "connected") {
+      toast.success("Offline mesh tunnel connected!");
+    }
     if (pc.iceConnectionState === "failed") {
-      toast.error("Offline Mesh: Connection failed. Devices might not be on the same Wi-Fi.");
+      toast.error("Offline tunnel failed. Are both devices on the same Wi-Fi?");
     }
   };
 
   return new Promise((resolve, reject) => {
     pc.onicecandidate = (event) => {
-      if (event.candidate === null) {
+      if (event.candidate) {
+        candidateCount++;
+        console.log(`[Offline Mesh Host] ICE candidate #${candidateCount}: ${event.candidate.candidate}`);
+      } else {
+        // Gathering complete
+        console.log(`[Offline Mesh Host] ICE gathering complete. ${candidateCount} candidates found.`);
+        if (candidateCount === 0) {
+          toast.warning("No local network candidates found. Make sure Wi-Fi is enabled.");
+        }
         if (pc.localDescription) {
           resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
         } else {
@@ -70,17 +81,18 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
       .then((offer) => pc.setLocalDescription(offer))
       .catch(reject);
 
-    // With empty iceServers, local candidates are gathered near-instantly.
-    // This timeout is just a safety net.
+    // Safety timeout — with empty iceServers, gathering should finish in <1 second.
+    // If it hasn't after 5s, something is very wrong.
     setTimeout(() => {
       if (pc.iceGatheringState !== "complete") {
+        console.warn(`[Offline Mesh Host] Timeout! Gathering state: ${pc.iceGatheringState}, candidates: ${candidateCount}`);
         if (pc.localDescription) {
           resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
         } else {
           reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 6000);
+    }, 5000);
   });
 }
 
@@ -88,12 +100,7 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
 export async function processJoinerOfferAndGenerateAnswer(compressedOffer: string): Promise<string> {
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
 
-  const pc = new RTCPeerConnection({ 
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" }
-    ]
-  });
+  const pc = new RTCPeerConnection({ iceServers: [] });
   activeOfflinePCs.push(pc);
 
   pc.ondatachannel = (event) => {
@@ -101,16 +108,27 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
     setupOfflineDataChannel(event.channel);
   };
 
+  let candidateCount = 0;
   pc.oniceconnectionstatechange = () => {
-    console.log(`[Offline Mesh Joiner] ICE state: ${pc.iceConnectionState}`);
+    console.log(`[Offline Mesh Joiner] ICE connection state: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "connected") {
+      toast.success("Offline mesh tunnel connected!");
+    }
     if (pc.iceConnectionState === "failed") {
-      toast.error("Offline Mesh: Connection failed. Devices might not be on the same Wi-Fi.");
+      toast.error("Offline tunnel failed. Are both devices on the same Wi-Fi?");
     }
   };
 
   return new Promise((resolve, reject) => {
     pc.onicecandidate = (event) => {
-      if (event.candidate === null) {
+      if (event.candidate) {
+        candidateCount++;
+        console.log(`[Offline Mesh Joiner] ICE candidate #${candidateCount}: ${event.candidate.candidate}`);
+      } else {
+        console.log(`[Offline Mesh Joiner] ICE gathering complete. ${candidateCount} candidates found.`);
+        if (candidateCount === 0) {
+          toast.warning("No local network candidates found. Make sure Wi-Fi is enabled.");
+        }
         if (pc.localDescription) {
           resolve(compressSDP(JSON.stringify(pc.localDescription)));
         } else {
@@ -126,13 +144,14 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
 
     setTimeout(() => {
       if (pc.iceGatheringState !== "complete") {
+        console.warn(`[Offline Mesh Joiner] Timeout! Gathering state: ${pc.iceGatheringState}, candidates: ${candidateCount}`);
         if (pc.localDescription) {
           resolve(compressSDP(JSON.stringify(pc.localDescription)));
         } else {
           reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 6000);
+    }, 5000);
   });
 }
 
