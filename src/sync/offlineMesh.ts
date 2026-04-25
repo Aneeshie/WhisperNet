@@ -3,6 +3,7 @@ import { getMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useNetworkStore } from "@/store";
 import { processIncomingMessage, getOnlinePeerCount } from "./mesh";
+import { toast } from "sonner";
 
 export const offlineDataChannels = new Map<string, RTCDataChannel>();
 
@@ -35,9 +36,7 @@ const pendingConnections = new Map<string, { pc: RTCPeerConnection, dc: RTCDataC
 // Step 1: Host generates an Offer
 export async function generateHostOffer(): Promise<{ offer: string, offerId: string }> {
   const pc = new RTCPeerConnection({ 
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
-    ] 
+    iceServers: [] // EMPTY — only gather local Wi-Fi IPs, internet-agnostic
   });
   activeOfflinePCs.push(pc);
   
@@ -61,15 +60,17 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
       .then((offer) => pc.setLocalDescription(offer))
       .catch(reject);
 
+    // With empty iceServers, local candidates are gathered near-instantly.
+    // This timeout is just a safety net.
     setTimeout(() => {
       if (pc.iceGatheringState !== "complete") {
         if (pc.localDescription) {
           resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
         } else {
-          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+          reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 5000); // Increased from 2000ms to 5000ms to ensure candidates are gathered
+    }, 3000);
   });
 }
 
@@ -78,9 +79,7 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
 
   const pc = new RTCPeerConnection({ 
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
-    ] 
+    iceServers: [] // EMPTY — only gather local Wi-Fi IPs, internet-agnostic
   });
   activeOfflinePCs.push(pc);
 
@@ -110,10 +109,10 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
         if (pc.localDescription) {
           resolve(compressSDP(JSON.stringify(pc.localDescription)));
         } else {
-          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+          reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 5000); // Increased from 2000ms to 5000ms
+    }, 3000);
   });
 }
 
@@ -138,9 +137,10 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
 
   const handleOpen = () => {
     if (offlineDataChannels.has(id)) return;
-    console.log(`[Offline Mesh] DataChannel open with ${id}`);
+    console.log(`[Offline Mesh] Local tunnel established with ${id}`);
     offlineDataChannels.set(id, dc);
     useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
+    toast.success("Local backup tunnel ready. Connection will survive internet drops!");
 
     // Request sync
     try {
@@ -190,6 +190,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
     console.log(`[Offline Mesh] DataChannel closed with ${id}`);
     offlineDataChannels.delete(id);
     useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
+    toast.warning("Local backup tunnel closed.");
   };
 }
 
