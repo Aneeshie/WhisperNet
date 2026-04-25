@@ -5,19 +5,27 @@ import { AnimatedQR } from "@/components/AnimatedQR";
 import QRCode from "qrcode";
 import { Download, Zap, Image } from "lucide-react";
 
+const SEND_OPTIONS = [
+  { value: 5, label: "Latest 5" },
+  { value: 10, label: "Latest 10" },
+  { value: 0, label: "All" },
+];
+
 export default function QRGen() {
   const [payloadString, setPayloadString] = useState<string>("");
   const [mode, setMode] = useState<"animated" | "static">("animated");
+  const [sendLimit, setSendLimit] = useState<number>(5);
   const [staticQrUrl, setStaticQrUrl] = useState<string>("");
   const [tooLarge, setTooLarge] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Regenerate payload when limit changes
   useEffect(() => {
     let isMounted = true;
 
     async function generatePayload() {
       try {
-        const payload = await exportBundle();
+        const payload = await exportBundle(sendLimit || undefined);
         if (isMounted) {
           setPayloadString(payload);
         }
@@ -32,13 +40,12 @@ export default function QRGen() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [sendLimit]);
 
   // Generate static QR when mode switches or payload changes
   useEffect(() => {
     if (mode !== "static" || !payloadString) return;
 
-    // QR Version 40 max: ~4296 alphanumeric chars with L error correction
     if (payloadString.length > 4000) {
       setTooLarge(true);
       setStaticQrUrl("");
@@ -53,7 +60,7 @@ export default function QRGen() {
         width: 1024,
         margin: 2,
         color: { dark: "#000000", light: "#ffffff" },
-        errorCorrectionLevel: "L", // Low error correction = max data capacity
+        errorCorrectionLevel: "L",
       },
       (err, url) => {
         if (err) {
@@ -78,7 +85,25 @@ export default function QRGen() {
   return (
     <div className="flex-1 flex flex-col items-center space-y-5">
 
-      {/* Mode Toggle */}
+      {/* How many messages to send */}
+      <div className="w-full max-w-xs space-y-2">
+        <label className="text-xs font-medium text-zinc-500 px-1">Messages to share</label>
+        <div className="flex p-1 bg-white/3 border border-white/5 rounded-xl">
+          {SEND_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setSendLimit(opt.value)}
+              className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
+                sendLimit === opt.value ? "bg-white/8 text-zinc-100 shadow-sm" : "text-zinc-500"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* QR Mode Toggle */}
       <div className="flex p-1 bg-white/3 border border-white/5 rounded-xl w-full max-w-xs">
         <button
           onClick={() => setMode("animated")}
@@ -106,7 +131,10 @@ export default function QRGen() {
           <AnimatedQR payload={payloadString} />
           <div className="text-center px-8">
             <p className="text-sm text-zinc-400">
-              Show this QR code to a friend to share your messages
+              {sendLimit > 0
+                ? `Sharing your ${sendLimit} latest messages`
+                : "Sharing all messages"
+              }
             </p>
             <p className="text-xs text-zinc-600 mt-1">
               They'll need to open the Receive tab and scan it
@@ -128,9 +156,9 @@ export default function QRGen() {
                 <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto">
                   <Image className="w-6 h-6 text-amber-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-zinc-300">Too many messages</h3>
+                <h3 className="text-sm font-semibold text-zinc-300">Too much data</h3>
                 <p className="text-xs text-zinc-500 leading-relaxed">
-                  A single QR code can't hold all your messages. Use the Animated mode to send them all, or clear older messages first.
+                  Try selecting fewer messages, or use Animated mode instead.
                 </p>
               </div>
             </div>
@@ -149,7 +177,7 @@ export default function QRGen() {
           <div className="text-center px-8 space-y-3">
             <p className="text-sm text-zinc-400">
               {tooLarge
-                ? "Switch to Animated mode to share all messages"
+                ? "Select fewer messages or switch to Animated"
                 : "A single QR code — perfect for printing or wall displays"
               }
             </p>

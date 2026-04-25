@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNetworkStore, useMessageStore } from "@/store";
-import { Clock, AlertTriangle, Navigation, Info, Users, Link2, Wifi } from "lucide-react";
+import { Clock, Users, Link2, Wifi } from "lucide-react";
 import type { Message } from "@/types/message";
 import { connectToPeer } from "@/sync/mesh";
 import { OfflineHandshake } from "@/components/OfflineHandshake";
@@ -14,6 +14,7 @@ export default function Feed() {
   const [connectId, setConnectId] = useState("");
   const [showOfflineHandshake, setShowOfflineHandshake] = useState(false);
   const [offlinePeerCount, setOfflinePeerCount] = useState(0);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -46,13 +47,13 @@ export default function Feed() {
   const getMessageStyle = (type: string) => {
     switch (type) {
       case "alert":
-        return { icon: AlertTriangle, dot: "bg-red-400", bg: "bg-red-500/5 border-red-500/10", label: "Alert" };
+        return { emoji: "🚨", bg: "bg-red-500/5 border-red-500/10", label: "Alert" };
       case "route":
-        return { icon: Navigation, dot: "bg-blue-400", bg: "bg-blue-500/5 border-blue-500/10", label: "Route" };
+        return { emoji: "🗺️", bg: "bg-blue-500/5 border-blue-500/10", label: "Route" };
       case "news":
-        return { icon: Info, dot: "bg-emerald-400", bg: "bg-emerald-500/5 border-emerald-500/10", label: "News" };
+        return { emoji: "📰", bg: "bg-emerald-500/5 border-emerald-500/10", label: "News" };
       default:
-        return { icon: Info, dot: "bg-zinc-400", bg: "bg-zinc-500/5 border-zinc-500/10", label: "Update" };
+        return { emoji: "📦", bg: "bg-zinc-500/5 border-zinc-500/10", label: "Resource" };
     }
   };
 
@@ -66,6 +67,17 @@ export default function Feed() {
   };
 
   const sortedMessages = [...messages].sort((a, b) => b.createdAt - a.createdAt);
+  const filteredMessages = activeFilter
+    ? sortedMessages.filter((m) => m.type === activeFilter)
+    : sortedMessages;
+
+  const FILTERS = [
+    { value: null, label: "All", count: messages.length },
+    { value: "alert", label: "🚨 Alerts", count: messages.filter((m) => m.type === "alert").length },
+    { value: "news", label: "📰 News", count: messages.filter((m) => m.type === "news").length },
+    { value: "route", label: "🗺️ Routes", count: messages.filter((m) => m.type === "route").length },
+    { value: "resource", label: "📦 Resources", count: messages.filter((m) => m.type === "resource").length },
+  ];
 
   return (
     <div className="flex flex-col h-full animate-fade-in-up">
@@ -186,18 +198,45 @@ export default function Feed() {
         )}
       </header>
 
-      {/* Divider */}
+      {/* Category Filters */}
+      <div className="px-5 py-3 flex gap-2 overflow-x-auto no-scrollbar">
+        {FILTERS.map((f) => (
+          <button
+            key={f.label}
+            onClick={() => setActiveFilter(f.value)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              activeFilter === f.value
+                ? "bg-white/10 text-zinc-100 shadow-sm"
+                : "bg-white/3 text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {f.label}
+            {f.count > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                activeFilter === f.value ? "bg-white/10" : "bg-white/5"
+              }`}>
+                {f.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="h-px bg-white/5 mx-5" />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-        {sortedMessages.length === 0 ? (
+        {filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-center">
-            <p className="text-sm text-zinc-600">No messages yet</p>
-            <p className="text-xs text-zinc-700 mt-1">Messages from your mesh will appear here</p>
+            <p className="text-sm text-zinc-600">
+              {activeFilter ? `No ${activeFilter} messages` : "No messages yet"}
+            </p>
+            <p className="text-xs text-zinc-700 mt-1">
+              {activeFilter ? "Try a different filter" : "Messages from your mesh will appear here"}
+            </p>
           </div>
         ) : (
-          sortedMessages.map((msg: Message) => {
+          filteredMessages.map((msg: Message) => {
             const style = getMessageStyle(msg.type);
 
             return (
@@ -206,8 +245,8 @@ export default function Feed() {
                 className={`glass-card p-4 border ${style.bg} transition-all duration-200 hover:border-white/10`}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm">{style.emoji}</span>
                     <span className="text-xs font-medium text-zinc-400">{style.label}</span>
                   </div>
                   <div className="flex items-center gap-1 text-zinc-600">

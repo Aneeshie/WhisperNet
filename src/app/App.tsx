@@ -7,6 +7,7 @@ import Alert from "@/pages/Alert";
 import Scan from "@/pages/Scan";
 import Settings from "@/pages/Settings";
 import Decoy from "@/pages/Decoy";
+import Setup from "@/pages/Setup";
 import { initMesh } from "@/sync/mesh";
 import { runTTLPass } from "@/sync/ttl";
 import { useSecurityStore } from "@/store";
@@ -23,8 +24,30 @@ export default function App() {
     return () => clearInterval(ttlInterval);
   }, []);
 
-  const { isUnlocked } = useSecurityStore();
+  const { isUnlocked, isFirstTime } = useSecurityStore();
 
+  // First time user — show setup to create PIN
+  if (isFirstTime) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background text-foreground font-sans">
+        <Toaster
+          theme="dark"
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "rgba(20, 20, 30, 0.9)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              backdropFilter: "blur(12px)",
+              borderRadius: "0.75rem",
+            }
+          }}
+        />
+        <Setup />
+      </div>
+    );
+  }
+
+  // Returning user — show decoy lock screen
   if (!isUnlocked) {
     return (
       <div className="flex flex-col min-h-screen bg-background text-foreground font-sans">
