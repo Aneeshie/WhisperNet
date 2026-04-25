@@ -14,8 +14,19 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-black text-zinc-50 font-sans selection:bg-zinc-800">
-      <Toaster theme="dark" position="top-center" />
+    <div className="flex flex-col min-h-screen bg-background text-foreground font-sans selection:bg-blue-500/20 selection:text-blue-200">
+      <Toaster
+        theme="dark"
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: "rgba(20, 20, 30, 0.9)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            backdropFilter: "blur(12px)",
+            borderRadius: "0.75rem",
+          }
+        }}
+      />
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto pb-16">
         <Routes>
