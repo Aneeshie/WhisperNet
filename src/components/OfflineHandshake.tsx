@@ -7,6 +7,7 @@ import { X, WifiOff } from "lucide-react";
 export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"SELECT" | "HOST" | "JOIN">("SELECT");
   const [step, setStep] = useState(1);
+  const [offerId, setOfferId] = useState<string>("");
   const [qrData, setQrData] = useState<string>("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,8 +17,9 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
     setStep(1);
     setLoading(true);
     try {
-      const offerStr = await generateHostOffer();
-      setQrData(offerStr);
+      const result = await generateHostOffer();
+      setQrData(result.offer);
+      setOfferId(result.offerId);
     } catch (e) {
       setError("Failed to generate Host Offer");
     } finally {
@@ -46,7 +48,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const handleHostScan = async (scanned: string) => {
     setLoading(true);
     try {
-      await finalizeHostConnection(scanned);
+      await finalizeHostConnection(scanned, offerId);
       onClose(); // Success!
     } catch (e) {
       setError("Invalid Joiner QR Code");

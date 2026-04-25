@@ -30,30 +30,22 @@ export function decompressSDP(b64: string): string {
 // OFFLINE MESH LOGIC
 // ----------------------------------------------------
 
-let pendingPc: RTCPeerConnection | null = null;
-let pendingDc: RTCDataChannel | null = null;
+const pendingConnections = new Map<string, { pc: RTCPeerConnection, dc: RTCDataChannel }>();
 
 // Step 1: Host generates an Offer
-export async function generateHostOffer(): Promise<string> {
-  // Add STUN servers as a fallback just in case local mDNS is blocked, 
-  // but it will seamlessly fallback to 100% offline if no internet is available.
-  const pc = new RTCPeerConnection({ 
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" }
-    ] 
-  }); 
+export async function generateHostOffer(): Promise<{ offer: string, offerId: string }> {
+  const pc = new RTCPeerConnection({ iceServers: [] }); // 100% offline
   activeOfflinePCs.push(pc);
-  pendingPc = pc;
-
+  
   const dc = pc.createDataChannel("offline-mesh");
-  pendingDc = dc;
+  const offerId = Math.random().toString(36).substring(2, 10);
+  pendingConnections.set(offerId, { pc, dc });
 
   return new Promise((resolve, reject) => {
     pc.onicecandidate = (event) => {
-      // When ICE gathering is completely finished, the localDescription contains all local IPs
       if (event.candidate === null) {
         if (pc.localDescription) {
-          resolve(compressSDP(JSON.stringify(pc.localDescription)));
+          resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
         } else {
           reject("No local description");
         }
@@ -64,10 +56,9 @@ export async function generateHostOffer(): Promise<string> {
       .then((offer) => pc.setLocalDescription(offer))
       .catch(reject);
 
-    // Timeout fallback just in case ICE gathering hangs
     setTimeout(() => {
       if (pc.iceGatheringState !== "complete" && pc.localDescription) {
-        resolve(compressSDP(JSON.stringify(pc.localDescription)));
+        resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
       }
     }, 5000); // Increased from 2000ms to 5000ms to ensure candidates are gathered
   });
@@ -113,19 +104,15 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
 }
 
 // Step 3: Host scans Answer
-export async function finalizeHostConnection(compressedAnswer: string): Promise<void> {
-  if (!pendingPc) throw new Error("No pending host connection");
+export async function finalizeHostConnection(compressedAnswer: string, offerId: string): Promise<void> {
+  const pending = pendingConnections.get(offerId);
+  if (!pending) throw new Error(`No pending host connection for offerId ${offerId}`);
 
   const answerDesc = JSON.parse(decompressSDP(compressedAnswer));
-  await pendingPc.setRemoteDescription(new RTCSessionDescription(answerDesc));
+  await pending.pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
 
-  if (pendingDc) {
-    setupOfflineDataChannel(pendingDc);
-  }
-
-  // DO NOT set pendingPc to null, we must keep the reference so it doesn't get GC'd.
-  // Instead, just clear pendingDc so it's not reused.
-  pendingDc = null;
+  setupOfflineDataChannel(pending.dc);
+  pendingConnections.delete(offerId);
 }
 
 // Global array to prevent garbage collection of RTCPeerConnections
