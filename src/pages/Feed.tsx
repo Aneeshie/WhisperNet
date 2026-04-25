@@ -124,8 +124,8 @@ export default function Feed() {
           </div>
         </div>
 
-        {/* Connection Card */}
-        {isOfflineMeshConnected ? (
+        {/* Connection Cards */}
+        {isOfflineMeshConnected && (
           <div className="glass-card p-4 glow-green">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -145,34 +145,18 @@ export default function Feed() {
               Add More Devices
             </button>
           </div>
-        ) : !isGlobalMeshReady ? (
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
-                <Link2 className="w-5 h-5 text-zinc-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-zinc-200">No Connection</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Connect to a friend nearby to start sharing messages
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowOfflineHandshake(true)}
-              className="w-full mt-3 py-2.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-sm font-medium transition-colors"
-            >
-              Connect Nearby
-            </button>
-          </div>
-        ) : (
+        )}
+
+        {isGlobalMeshReady ? (
           <div className="glass-card p-4 glow-blue">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <Link2 className="w-5 h-5 text-blue-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-blue-300">Ready to Connect</h3>
+                <h3 className="text-sm font-semibold text-blue-300">
+                  {peerCount > 0 ? `Connected · ${peerCount} peer${peerCount > 1 ? "s" : ""}` : "Ready to Connect"}
+                </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   Your ID: <span className="text-zinc-200 font-semibold select-all">{myPeerId}</span>
                 </p>
@@ -194,6 +178,26 @@ export default function Feed() {
                 Connect
               </button>
             </form>
+          </div>
+        ) : !isOfflineMeshConnected && (
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+                <Link2 className="w-5 h-5 text-zinc-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-zinc-200">No Connection</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Connect to a friend nearby to start sharing messages
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowOfflineHandshake(true)}
+              className="w-full mt-3 py-2.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/20 text-blue-300 text-sm font-medium transition-colors"
+            >
+              Connect Nearby
+            </button>
           </div>
         )}
       </header>
