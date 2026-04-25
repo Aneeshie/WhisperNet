@@ -148,7 +148,7 @@ function setupConnection(conn: DataConnection) {
 
     // --- SILENT OFFLINE TUNNEL BOOTSTRAPPING ---
     const myId = useUIStore.getState().myPeerId;
-    if (myId > conn.peer) {
+    if (myId && myId > conn.peer) {
       try {
         console.log(`[Offline Mesh] Bootstrapping silent host tunnel for ${conn.peer}...`);
         const result = await generateHostOffer();
