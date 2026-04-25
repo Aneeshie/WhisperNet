@@ -1,11 +1,11 @@
 import { useState, useRef } from "react";
-import { useUIStore, useMessageStore, useNetworkStore } from "@/store";
+import { useUIStore, useMessageStore, useNetworkStore, useSecurityStore } from "@/store";
 import { toast } from "sonner";
 import { db } from "@/db/db";
 import { createMessage, deleteExpiredMessages } from "@/db/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType } from "@/types/message";
-import { Smartphone, Trash2, Sparkles, Clock, ChevronRight } from "lucide-react";
+import { Smartphone, Trash2, Sparkles, Clock, ChevronRight, Lock } from "lucide-react";
 
 import {
   AlertDialog,
@@ -26,6 +26,8 @@ export default function Settings() {
 
   // Stealth Dev Mode State
   const [devModeEnabled, setDevModeEnabled] = useState(false);
+  const [showPinInput, setShowPinInput] = useState(false);
+  const [newPinValue, setNewPinValue] = useState("");
   const tapCountRef = useRef(0);
   const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -106,10 +108,19 @@ export default function Settings() {
     try {
       await deleteExpiredMessages();
       await fetchMessages();
-      toast.info("Expired messages cleaned up");
+      toast.info("TTL Cleanup triggered successfully.");
     } catch (error) {
       console.error("handleTTL error:", error);
-      toast.error("Failed to clean up");
+      toast.error("Failed to run TTL cleanup.");
+    }
+  };
+
+  const handleSavePin = () => {
+    if (newPinValue.trim().length > 0) {
+      useSecurityStore.getState().setPin(newPinValue.trim());
+      setShowPinInput(false);
+      setNewPinValue("");
+      toast.success("Unlock PIN updated successfully!");
     }
   };
 
@@ -220,6 +231,41 @@ export default function Settings() {
             </div>
           </div>
         )}
+
+        {/* Security Settings */}
+        <div className="space-y-2 animate-fade-in-up mt-8">
+          <h2 className="text-xs font-medium text-emerald-500/80 uppercase tracking-wider px-1 flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5" />
+            Security
+          </h2>
+          <div className="glass-card overflow-hidden border-emerald-500/20">
+            {!showPinInput ? (
+              <button
+                onClick={() => setShowPinInput(true)}
+                className="w-full p-4 text-left text-sm text-zinc-300 hover:bg-white/3 transition-colors flex items-center gap-3"
+              >
+                <Lock className="w-4 h-4 text-zinc-500" />
+                Change Decoy PIN
+              </button>
+            ) : (
+              <div className="p-4 flex flex-col gap-3">
+                <label className="text-xs text-zinc-400">New Unlock PIN</label>
+                <input 
+                  type="text" 
+                  value={newPinValue} 
+                  onChange={(e) => setNewPinValue(e.target.value)} 
+                  className="w-full bg-black/20 border border-white/10 rounded-lg py-2 px-3 text-zinc-200 text-sm focus:outline-none focus:border-emerald-500/50" 
+                  placeholder="e.g. 1234"
+                  autoFocus
+                />
+                <div className="flex gap-2 justify-end mt-1">
+                  <button onClick={() => setShowPinInput(false)} className="px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">Cancel</button>
+                  <button onClick={handleSavePin} className="px-3 py-1.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors">Save</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Security / Danger Zone */}
         <div className="space-y-2 animate-fade-in-up mt-8">

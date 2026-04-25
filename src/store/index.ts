@@ -14,6 +14,31 @@ export const useUIStore = create<UIState>((set) => ({
   setNavigating: (state) => set({ isNavigating: state }),
 }));
 
+interface SecurityState {
+  isUnlocked: boolean;
+  pin: string;
+  unlock: (pin: string) => boolean;
+  lock: () => void;
+  setPin: (newPin: string) => void;
+}
+
+export const useSecurityStore = create<SecurityState>((set, get) => ({
+  isUnlocked: false,
+  pin: localStorage.getItem("whispernet_pin") || "1234",
+  unlock: (pin: string) => {
+    if (pin === get().pin) {
+      set({ isUnlocked: true });
+      return true;
+    }
+    return false;
+  },
+  lock: () => set({ isUnlocked: false }),
+  setPin: (newPin: string) => {
+    localStorage.setItem("whispernet_pin", newPin);
+    set({ pin: newPin });
+  },
+}));
+
 interface NetworkState {
   peerCount: number;
   myPeerId: string | null;
