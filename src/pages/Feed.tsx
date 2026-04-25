@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNetworkStore, useMessageStore } from "@/store";
-import { Clock, Navigation, AlertTriangle, Info } from "lucide-react";
+import { Clock, Navigation, AlertTriangle, Info, Wifi } from "lucide-react";
 import type { Message } from "@/types/message";
 import { connectToPeer } from "@/sync/mesh";
 import { OfflineHandshake } from "@/components/OfflineHandshake";
+import { offlineDataChannels } from "@/sync/offlineMesh";
 
 export default function Feed() {
   const { messages, fetchMessages } = useMessageStore();
@@ -12,6 +13,19 @@ export default function Feed() {
   const [now, setNow] = useState(() => Date.now());
   const [connectId, setConnectId] = useState("");
   const [showOfflineHandshake, setShowOfflineHandshake] = useState(false);
+  // Track offline tunnel count as local state so component re-renders when it changes
+  const [offlinePeerCount, setOfflinePeerCount] = useState(0);
+
+  // Poll offline tunnel count every second so UI stays in sync
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setOfflinePeerCount(offlineDataChannels.size);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isOfflineMeshConnected = offlinePeerCount > 0;
+  const isGlobalMeshReady = !!myPeerId;
 
   useEffect(() => {
     fetchMessages();
@@ -87,12 +101,40 @@ export default function Feed() {
       <header className="py-4 border-b border-zinc-900 space-y-4">
         <div>
           <h1 className="text-xl font-bold tracking-tight">WhisperNet Feed</h1>
-          <p className={`text-xs font-mono mt-1 ${peerCount > 0 ? "text-green-500" : "text-zinc-500"}`}>
-            NODE_STATUS: {peerCount > 0 ? `ONLINE_MESH (${peerCount} PEERS)` : "OFFLINE_MESH"} | MSGS: {messages.length}
+          <p className={`text-xs font-mono mt-1 ${
+            peerCount > 0 ? "text-green-500" :
+            isOfflineMeshConnected ? "text-orange-400" :
+            "text-zinc-500"
+          }`}>
+            NODE_STATUS: {
+              peerCount > 0 ? `ONLINE_MESH (${peerCount} PEERS)` :
+              isOfflineMeshConnected ? `LOCAL_MESH (${offlinePeerCount} PEERS)` :
+              "OFFLINE_MESH"
+            } | MSGS: {messages.length}
           </p>
         </div>
 
-        {!myPeerId ? (
+        {isOfflineMeshConnected ? (
+          // Offline QR tunnel is live — show green connected card
+          <div className="bg-green-950/20 border border-green-900/50 p-3 rounded-lg flex flex-col space-y-3">
+            <div className="flex items-start space-x-3">
+              <Wifi className="w-5 h-5 text-green-400 mt-0.5" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-green-400 font-mono tracking-wide">LOCAL MESH ACTIVE</h3>
+                <p className="text-xs text-green-300/80 font-mono leading-relaxed">
+                  Connected to {offlinePeerCount} peer{offlinePeerCount > 1 ? "s" : ""} via local Wi-Fi WebRTC tunnel. Messages are routing without the internet.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowOfflineHandshake(true)}
+              className="w-full bg-green-900/30 hover:bg-green-900/50 border border-green-900/50 text-green-100 py-2 rounded-md font-mono text-xs tracking-wider transition-colors font-bold"
+            >
+              ADD MORE PEERS
+            </button>
+          </div>
+        ) : !isGlobalMeshReady ? (
+          // No internet, no offline tunnel — show the prompt to start handshake
           <div className="bg-red-950/20 border border-red-900/50 p-3 rounded-lg flex flex-col space-y-3">
             <div className="flex items-start space-x-3">
               <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
@@ -111,6 +153,7 @@ export default function Feed() {
             </button>
           </div>
         ) : (
+          // Internet available — show global mesh card
           <div className="bg-blue-950/20 border border-blue-900/50 p-3 rounded-lg space-y-3">
             <div className="flex items-start space-x-3">
               <Info className="w-5 h-5 text-blue-400 mt-0.5" />
