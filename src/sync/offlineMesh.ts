@@ -35,7 +35,13 @@ let pendingDc: RTCDataChannel | null = null;
 
 // Step 1: Host generates an Offer
 export async function generateHostOffer(): Promise<string> {
-  const pc = new RTCPeerConnection({ iceServers: [] }); // 100% offline
+  // Add STUN servers as a fallback just in case local mDNS is blocked, 
+  // but it will seamlessly fallback to 100% offline if no internet is available.
+  const pc = new RTCPeerConnection({ 
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }
+    ] 
+  }); 
   activeOfflinePCs.push(pc);
   pendingPc = pc;
 
@@ -63,7 +69,7 @@ export async function generateHostOffer(): Promise<string> {
       if (pc.iceGatheringState !== "complete" && pc.localDescription) {
         resolve(compressSDP(JSON.stringify(pc.localDescription)));
       }
-    }, 2000);
+    }, 5000); // Increased from 2000ms to 5000ms to ensure candidates are gathered
   });
 }
 
@@ -71,7 +77,11 @@ export async function generateHostOffer(): Promise<string> {
 export async function processJoinerOfferAndGenerateAnswer(compressedOffer: string): Promise<string> {
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
 
-  const pc = new RTCPeerConnection({ iceServers: [] });
+  const pc = new RTCPeerConnection({ 
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }
+    ] 
+  });
   activeOfflinePCs.push(pc);
 
   pc.ondatachannel = (event) => {
@@ -98,7 +108,7 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
       if (pc.iceGatheringState !== "complete" && pc.localDescription) {
         resolve(compressSDP(JSON.stringify(pc.localDescription)));
       }
-    }, 2000);
+    }, 5000); // Increased from 2000ms to 5000ms
   });
 }
 
@@ -131,7 +141,11 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
     useUIStore.getState().setPeerCount(useUIStore.getState().peerCount + 1);
 
     // Request sync
-    dc.send(JSON.stringify({ type: "sync_req" }));
+    try {
+      dc.send(JSON.stringify({ type: "sync_req" }));
+    } catch (err) {
+      console.error("Failed to send sync_req", err);
+    }
   };
 
   if (dc.readyState === "open") {
@@ -146,13 +160,24 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
 
       if (parsed.type === "sync_req") {
         const myMessages = await getMessages();
-        dc.send(JSON.stringify({ type: "sync_res", messages: myMessages }));
+        // Send messages in small batches to avoid WebRTC DataChannel message size limits
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
+          const batch = myMessages.slice(i, i + BATCH_SIZE);
+          try {
+            dc.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          } catch (err) {
+            console.error("Failed to send sync_res batch", err);
+          }
+          // Sleep slightly to prevent buffer overflow on the DataChannel
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
       } else if (parsed.type === "sync_res") {
         for (const msg of parsed.messages) {
-          processIncomingMessage(msg, false); // DO NOT RELAY
+          await processIncomingMessage(msg, false); // DO NOT RELAY
         }
       } else if (parsed.type === "broadcast") {
-        processIncomingMessage(parsed.message, true); // RELAY
+        await processIncomingMessage(parsed.message, true); // RELAY
       }
     } catch (e) {
       console.error("[Offline Mesh] Parse error", e);

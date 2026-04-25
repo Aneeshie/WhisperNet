@@ -76,7 +76,12 @@ function setupConnection(conn: DataConnection) {
 
       if ((parsed as any).type === "sync_req") {
         const myMessages = await getMessages();
-        conn.send(JSON.stringify({ type: "sync_res", messages: myMessages }));
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
+          const batch = myMessages.slice(i, i + BATCH_SIZE);
+          conn.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          await new Promise(r => setTimeout(r, 50));
+        }
       } else if ((parsed as any).type === "sync_res") {
         for (const msg of (parsed as any).messages) {
           await processIncomingMessage(msg, false); // DO NOT RELAY historical sync
