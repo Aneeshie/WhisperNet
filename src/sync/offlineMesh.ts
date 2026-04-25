@@ -36,7 +36,10 @@ const pendingConnections = new Map<string, { pc: RTCPeerConnection, dc: RTCDataC
 // Step 1: Host generates an Offer
 export async function generateHostOffer(): Promise<{ offer: string, offerId: string }> {
   const pc = new RTCPeerConnection({ 
-    iceServers: [] // EMPTY — only gather local Wi-Fi IPs, internet-agnostic
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" }
+    ]
   });
   activeOfflinePCs.push(pc);
   
@@ -77,7 +80,7 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
           reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 3000);
+    }, 6000);
   });
 }
 
@@ -86,7 +89,10 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
 
   const pc = new RTCPeerConnection({ 
-    iceServers: [] // EMPTY — only gather local Wi-Fi IPs, internet-agnostic
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" }
+    ]
   });
   activeOfflinePCs.push(pc);
 
@@ -126,7 +132,7 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
           reject(new Error("Timeout: no local description available"));
         }
       }
-    }, 3000);
+    }, 6000);
   });
 }
 
