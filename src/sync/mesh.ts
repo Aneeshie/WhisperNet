@@ -2,6 +2,7 @@ import Peer, { type DataConnection } from "peerjs";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useNetworkStore, useMessageStore } from "@/store";
+import { verifySignature, getSignablePayload } from "@/privacy/crypto";
 
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
@@ -250,7 +251,17 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
     return;
   }
 
-  // 3. Save and update UI
+  // 3. Verify signature if present
+  if (msg.signature && msg.senderPublicKey) {
+    const payload = getSignablePayload(msg);
+    const isValid = await verifySignature(msg.senderPublicKey, payload, msg.signature);
+    msg.trusted = isValid;
+  } else {
+    // No signature = untrusted
+    msg.trusted = false;
+  }
+
+  // 4. Save and update UI
   try {
     await createMessage(msg);
     existing.push(msg);
@@ -260,7 +271,7 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
     return; // Stop processing and don't relay if save failed
   }
   
-  // 4. Relay the message (Flooding algorithm)
+  // 5. Relay the message (Flooding algorithm)
   if (shouldRelay) {
     await broadcastMessage(msg);
   }

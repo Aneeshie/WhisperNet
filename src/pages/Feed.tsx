@@ -252,6 +252,13 @@ export default function Feed() {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm">{style.emoji}</span>
                     <span className="text-xs font-medium text-zinc-400">{style.label}</span>
+                    {msg.signature ? (
+                      msg.trusted ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium" title="Signature verified">✓ signed</span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium" title="Signature invalid or tampered">⚠ unverified</span>
+                      )
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-1 text-zinc-600">
                     <Clock className="w-3 h-3" />
