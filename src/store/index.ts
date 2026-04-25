@@ -16,14 +16,17 @@ export const useUIStore = create<UIState>((set) => ({
 
 interface SecurityState {
   isUnlocked: boolean;
+  isFirstTime: boolean;
   pin: string;
   unlock: (pin: string) => boolean;
   lock: () => void;
   setPin: (newPin: string) => void;
+  completeSetup: (pin: string) => void;
 }
 
 export const useSecurityStore = create<SecurityState>((set, get) => ({
   isUnlocked: false,
+  isFirstTime: !localStorage.getItem("whispernet_pin"),
   pin: localStorage.getItem("whispernet_pin") || "1234",
   unlock: (pin: string) => {
     if (pin === get().pin) {
@@ -36,6 +39,10 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
   setPin: (newPin: string) => {
     localStorage.setItem("whispernet_pin", newPin);
     set({ pin: newPin });
+  },
+  completeSetup: (pin: string) => {
+    localStorage.setItem("whispernet_pin", pin);
+    set({ pin, isFirstTime: false, isUnlocked: true });
   },
 }));
 
