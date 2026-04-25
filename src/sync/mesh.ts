@@ -245,9 +245,9 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
   if (seenMessageIds.has(msg.id)) return;
   seenMessageIds.add(msg.id);
 
-  // 2. Database dedup (just to be safe)
-  const existing = await getMessages();
-  if (existing.some((m) => m.id === msg.id)) {
+  // 2. Database dedup — only check IDs, don't use these records for UI
+  const dbRecords = await getMessages();
+  if (dbRecords.some((m) => m.id === msg.id)) {
     return;
   }
 
@@ -257,11 +257,10 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
     const isValid = await verifySignature(msg.senderPublicKey, payload, msg.signature);
     msg.trusted = isValid;
   } else {
-    // No signature = untrusted
     msg.trusted = false;
   }
 
-  // 4. Encrypt content before storing, keep plaintext for UI + relay
+  // 4. Save to DB (encrypted) and update UI (plaintext)
   const plaintextContent = msg.content;
   try {
     const encKey = useSecurityStore.getState().encryptionKey;
@@ -273,10 +272,12 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
     } else {
       await createMessage(msg);
     }
-    // Keep plaintext in memory for the UI
+
+    // Use the CURRENT IN-MEMORY messages (already decrypted) for UI, NOT raw DB records
+    msg.content = plaintextContent;
     msg.encrypted = false;
-    existing.push(msg);
-    useMessageStore.setState({ messages: [...existing] });
+    const currentMessages = useMessageStore.getState().messages;
+    useMessageStore.setState({ messages: [...currentMessages, msg] });
   } catch (e) {
     console.error("Failed to save incoming message", e);
     return;
