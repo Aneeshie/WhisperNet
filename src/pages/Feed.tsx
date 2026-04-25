@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import { useUIStore } from "@/store";
 import { Clock, Navigation, AlertTriangle, Info } from "lucide-react";
 import type { Message } from "@/types/message";
+import { connectToPeer } from "@/sync/mesh";
+import { OfflineHandshake } from "@/components/OfflineHandshake";
 
 export default function Feed() {
-  const { messages, fetchMessages, peerCount } = useUIStore();
+  const { messages, fetchMessages, peerCount, myPeerId } = useUIStore();
 
   const [now, setNow] = useState(() => Date.now());
+  const [connectId, setConnectId] = useState("");
+  const [showOfflineHandshake, setShowOfflineHandshake] = useState(false);
 
   useEffect(() => {
     fetchMessages();
@@ -19,6 +23,14 @@ export default function Feed() {
 
     return () => clearInterval(interval);
   }, []);
+
+  const handleConnect = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (connectId.trim()) {
+      connectToPeer(connectId.trim());
+      setConnectId("");
+    }
+  };
 
   const getMessageConfig = (type: string) => {
     switch (type) {
@@ -69,12 +81,71 @@ export default function Feed() {
 
   return (
     <div className="flex flex-col h-full p-4 space-y-4">
-      <header className="py-4 border-b border-zinc-900">
-        <h1 className="text-xl font-bold tracking-tight">WhisperNet Feed</h1>
+      {showOfflineHandshake && <OfflineHandshake onClose={() => setShowOfflineHandshake(false)} />}
+      
+      <header className="py-4 border-b border-zinc-900 space-y-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">WhisperNet Feed</h1>
+          <p className={`text-xs font-mono mt-1 ${peerCount > 0 ? "text-green-500" : "text-zinc-500"}`}>
+            NODE_STATUS: {peerCount > 0 ? `ONLINE_MESH (${peerCount} PEERS)` : "OFFLINE_MESH"} | MSGS: {messages.length}
+          </p>
+        </div>
 
-        <p className={`text-xs font-mono mt-1 ${peerCount > 0 ? "text-green-500" : "text-zinc-500"}`}>
-          NODE_STATUS: {peerCount > 0 ? `ONLINE_MESH (${peerCount} PEERS)` : "OFFLINE_MESH"} | MSGS: {messages.length}
-        </p>
+        {!myPeerId ? (
+          <div className="bg-red-950/20 border border-red-900/50 p-3 rounded-lg flex flex-col space-y-3">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-red-500 font-mono tracking-wide">OFFLINE MODE</h3>
+                <p className="text-xs text-red-400/80 font-mono leading-relaxed">
+                  No internet connection detected. The global mesh is unavailable. You can sync via the Scan page, or establish a live offline Wi-Fi mesh below.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowOfflineHandshake(true)}
+              className="w-full bg-red-900/40 hover:bg-red-900/60 border border-red-900/50 text-red-100 py-2 rounded-md font-mono text-xs tracking-wider transition-colors font-bold"
+            >
+              START QR MESH HANDSHAKE
+            </button>
+          </div>
+        ) : (
+          <div className="bg-blue-950/20 border border-blue-900/50 p-3 rounded-lg space-y-3">
+            <div className="flex items-start space-x-3">
+              <Info className="w-5 h-5 text-blue-400 mt-0.5" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-blue-400 font-mono tracking-wide">GLOBAL MESH READY</h3>
+                <p className="text-xs text-blue-300/80 font-mono leading-relaxed">
+                  You are connected to the global matchmaking server. Share your ID below, or enter a friend's ID to establish a secure P2P WebRTC tunnel.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <div className="flex-1 bg-zinc-950/50 border border-zinc-800 rounded px-3 py-2 flex justify-between items-center">
+                <span className="text-xs font-mono text-zinc-500">MY ID:</span>
+                <span className="text-sm text-zinc-100 select-all font-bold tracking-wider">{myPeerId}</span>
+              </div>
+              
+              <form onSubmit={handleConnect} className="flex-1 flex gap-2">
+                <input 
+                  type="text" 
+                  value={connectId}
+                  onChange={(e) => setConnectId(e.target.value)}
+                  placeholder="Enter Peer ID..." 
+                  className="flex-1 bg-zinc-950/50 border border-zinc-800 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-900/80 transition-colors"
+                />
+                <button 
+                  type="submit" 
+                  disabled={!connectId.trim()}
+                  className="bg-blue-900/80 hover:bg-blue-800 text-blue-100 text-xs font-mono px-4 py-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-bold tracking-wide"
+                >
+                  CONNECT
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 space-y-4 pb-4">

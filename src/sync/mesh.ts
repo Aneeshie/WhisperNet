@@ -1,99 +1,151 @@
-import { joinRoom } from "trystero/nostr";
+import Peer, { type DataConnection } from "peerjs";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useUIStore } from "@/store";
 
-const ROOM_ID = "whispernet-mesh-default-room";
-
-// Trystero room instance
-let room: any = null;
-
-// Actions
-let broadcastAction: any = null;
+let peer: Peer | null = null;
+const connections = new Map<string, DataConnection>();
 
 export function initMesh() {
-  if (room) return;
+  if (peer) return;
 
-  room = joinRoom({ appId: "whispernet-mesh" }, ROOM_ID);
-
-  const [sendBroadcast, getBroadcast] = room.makeAction("broadcast");
-  const [sendSyncReq, getSyncReq] = room.makeAction("sync_req");
-  const [sendSyncRes, getSyncRes] = room.makeAction("sync_res");
-
-  broadcastAction = sendBroadcast;
-
-  room.onPeerJoin((peerId: string) => {
-    console.log(`[Mesh] Peer joined: ${peerId}`);
-    // Sync missing messages from this new peer
-    // Tell them we want to sync
-    sendSyncReq("ping", peerId);
-
-    // Update peer count in store
-    useUIStore.getState().addPeer();
-  });
-
-  room.onPeerLeave((peerId: string) => {
-    console.log(`[Mesh] Peer left: ${peerId}`);
-    useUIStore.getState().removePeer();
-  });
-
-  // Handle incoming broadcast messages
-  getBroadcast(async (data: any, peerId: string) => {
-    console.log(`[Mesh] Received broadcast from ${peerId}`, data);
-    const msg = data as Message;
-    await processIncomingMessage(msg);
-  });
-
-  // Handle sync requests: send all our messages back to the requesting peer
-  getSyncReq(async (_data: any, peerId: string) => {
-    console.log(`[Mesh] Sync request from ${peerId}`);
-    const myMessages = await getMessages();
-    sendSyncRes(myMessages, peerId);
-  });
-
-  // Handle sync responses: process all messages received
-  getSyncRes(async (data: any, peerId: string) => {
-    console.log(`[Mesh] Sync response from ${peerId}`);
-    const messages = data as Message[];
-    for (const msg of messages) {
-      await processIncomingMessage(msg);
+  // Initialize PeerJS with the free public cloud signaling server
+  peer = new Peer({
+    config: {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:global.stun.twilio.com:3478" }
+      ]
     }
+  });
+
+  peer.on("open", (id) => {
+    console.log(`[Mesh] Connected to global signaling server. My ID: ${id}`);
+    useUIStore.getState().setMyPeerId(id);
+  });
+
+  peer.on("connection", (conn) => {
+    console.log(`[Mesh] Incoming connection from ${conn.peer}`);
+    setupConnection(conn);
+  });
+
+  peer.on("disconnected", () => {
+    console.log("[Mesh] Disconnected from signaling server");
+    // Try to reconnect to signaling server
+    if (peer && !peer.destroyed) {
+      peer.reconnect();
+    }
+  });
+
+  peer.on("error", (err) => {
+    console.error("[Mesh] PeerJS Error:", err);
   });
 }
 
-export async function broadcastMessage(msg: Message) {
-  if (!broadcastAction) return;
+export function connectToPeer(targetId: string) {
+  if (!peer) {
+    console.error("[Mesh] PeerJS not initialized");
+    return;
+  }
+  
+  if (connections.has(targetId) || targetId === peer.id) {
+    return; // Already connected or trying to connect to self
+  }
 
-  // Create a copy to increment hop count for relay
+  console.log(`[Mesh] Initiating connection to ${targetId}...`);
+  const conn = peer.connect(targetId, {
+    reliable: true,
+  });
+
+  setupConnection(conn);
+}
+
+function setupConnection(conn: DataConnection) {
+  conn.on("open", () => {
+    console.log(`[Mesh] DataChannel open with ${conn.peer}`);
+    connections.set(conn.peer, conn);
+    useUIStore.getState().setPeerCount(connections.size);
+
+    // Request sync from this new peer
+    conn.send(JSON.stringify({ type: "sync_req" }));
+  });
+
+  conn.on("data", async (data: unknown) => {
+    try {
+      const parsed = typeof data === "string" ? JSON.parse(data as string) : data;
+
+      if ((parsed as any).type === "sync_req") {
+        const myMessages = await getMessages();
+        conn.send(JSON.stringify({ type: "sync_res", messages: myMessages }));
+      } else if ((parsed as any).type === "sync_res") {
+        for (const msg of (parsed as any).messages) {
+          await processIncomingMessage(msg, false); // DO NOT RELAY historical sync
+        }
+      } else if ((parsed as any).type === "broadcast") {
+        await processIncomingMessage((parsed as any).message, true);
+      }
+    } catch (e) {
+      console.error("[Mesh] Failed to process incoming data", e);
+    }
+  });
+
+  conn.on("close", () => {
+    console.log(`[Mesh] DataChannel closed with ${conn.peer}`);
+    connections.delete(conn.peer);
+    useUIStore.getState().setPeerCount(connections.size);
+  });
+
+  conn.on("error", (err) => {
+    console.error(`[Mesh] Connection error with ${conn.peer}:`, err);
+  });
+}
+
+import { broadcastOfflineMessage } from "./offlineMesh";
+
+// In-memory cache for instant synchronous deduplication to prevent async race conditions
+const seenMessageIds = new Set<string>();
+
+export async function broadcastMessage(msg: Message) {
   const relayMsg = { ...msg, hopCount: msg.hopCount + 1 };
 
   if (relayMsg.hopCount <= relayMsg.maxHopCount) {
-    broadcastAction(relayMsg);
+    const payload = JSON.stringify({ type: "broadcast", message: relayMsg });
+    for (const conn of connections.values()) {
+      if (conn.open) {
+        conn.send(payload);
+      }
+    }
+    await broadcastOfflineMessage(msg);
   }
 }
 
-async function processIncomingMessage(msg: Message) {
-  // Check if we already have it to prevent infinite loops and duplicates
+export async function processIncomingMessage(msg: Message, shouldRelay: boolean = true) {
+  // 1. Synchronous dedup (prevents async race conditions during massive network floods)
+  if (seenMessageIds.has(msg.id)) return;
+  seenMessageIds.add(msg.id);
+
+  // 2. Database dedup (just to be safe)
   const existing = await getMessages();
   if (existing.some((m) => m.id === msg.id)) {
-    return; // Already seen, ignore
+    return;
   }
 
-  // Save to DB
+  // 3. Save and update UI
   await createMessage(msg);
-
-  // Update UI Store
-  const updatedMessages = await getMessages();
-  useUIStore.setState({ messages: updatedMessages });
-
-  // Relay the message (Flooding algorithm)
-  await broadcastMessage(msg);
+  useUIStore.setState({ messages: await getMessages() });
+  
+  // 4. Relay the message (Flooding algorithm)
+  if (shouldRelay) {
+    await broadcastMessage(msg);
+  }
 }
 
 export function leaveMesh() {
-  if (room) {
-    room.leave();
-    room = null;
-    useUIStore.getState().setPeerCount(0);
+  if (peer) {
+    peer.destroy();
+    peer = null;
   }
+  connections.clear();
+  useUIStore.getState().setPeerCount(0);
+  useUIStore.getState().setMyPeerId("");
 }

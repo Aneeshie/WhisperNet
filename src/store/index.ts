@@ -11,7 +11,9 @@ interface UIState {
   fetchMessages: () => Promise<void>;
   addMessage: (msg: Message) => Promise<void>;
   peerCount: number;
+  myPeerId: string | null;
   setPeerCount: (count: number) => void;
+  setMyPeerId: (id: string) => void;
   addPeer: () => void;
   removePeer: () => void;
 }
@@ -21,7 +23,9 @@ export const useUIStore = create<UIState>((set, get) => ({
   setNavigating: (state) => set({ isNavigating: state }),
   messages: [],
   peerCount: 0,
+  myPeerId: null,
   setPeerCount: (count) => set({ peerCount: count }),
+  setMyPeerId: (id) => set({ myPeerId: id }),
   addPeer: () => set({ peerCount: get().peerCount + 1 }),
   removePeer: () => set({ peerCount: Math.max(0, get().peerCount - 1) }),
   fetchMessages: async () => {

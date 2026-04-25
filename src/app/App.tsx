@@ -11,7 +11,6 @@ import { initMesh, leaveMesh } from "@/sync/mesh";
 export default function App() {
   useEffect(() => {
     initMesh();
-    return () => leaveMesh();
   }, []);
 
   return (
