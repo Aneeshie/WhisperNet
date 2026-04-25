@@ -184,3 +184,62 @@ export async function decrypt(key: CryptoKey, encryptedBase64: string): Promise<
 export function getSignablePayload(msg: { id: string; content: string; createdAt: number }): string {
   return `${msg.id}:${msg.content}:${msg.createdAt}`;
 }
+
+// ─── HMAC-SHA256 (QR Bundle Integrity) ───────────────────────────
+
+/**
+ * Derives a dedicated HMAC key from the same PIN salt.
+ * We can't export the AES-GCM key (non-extractable), so we derive
+ * a separate key using PBKDF2 with a "hmac-" prefixed salt.
+ */
+async function deriveHmacKey(): Promise<CryptoKey | null> {
+  const salt = localStorage.getItem("whispernet_pin_salt");
+  if (!salt) return null;
+
+  // Use the stored PIN hash as key material (we can't access the raw PIN)
+  const pinHash = localStorage.getItem("whispernet_pin_hash");
+  if (!pinHash) return null;
+
+  const encoder = new TextEncoder();
+  const saltBytes = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
+  // Create a unique salt for HMAC by appending a domain separator
+  const hmacSalt = new Uint8Array(saltBytes.length + 5);
+  hmacSalt.set(saltBytes);
+  hmacSalt.set(encoder.encode("hmac:"), saltBytes.length);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    Uint8Array.from(atob(pinHash), c => c.charCodeAt(0)),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: hmacSalt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    keyMaterial,
+    { name: "HMAC", hash: "SHA-256", length: 256 },
+    false,
+    ["sign", "verify"]
+  );
+}
+
+export async function hmacSign(_key: CryptoKey, data: string): Promise<string> {
+  const hmacKey = await deriveHmacKey();
+  if (!hmacKey) throw new Error("Cannot derive HMAC key");
+
+  const encoder = new TextEncoder();
+  const signature = await crypto.subtle.sign("HMAC", hmacKey, encoder.encode(data));
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+export async function hmacVerify(_key: CryptoKey, data: string, expectedHmac: string): Promise<boolean> {
+  try {
+    const computed = await hmacSign(_key, data);
+    return computed === expectedHmac;
+  } catch {
+    return false;
+  }
+}
+
+

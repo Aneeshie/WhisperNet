@@ -13,6 +13,8 @@ import {
   signData,
   getSignablePayload,
   deriveEncryptionKey,
+  encrypt,
+  decrypt,
 } from "@/privacy/crypto";
 
 interface UIState {
@@ -28,14 +30,15 @@ export const useUIStore = create<UIState>((set) => ({
 interface SecurityState {
   isUnlocked: boolean;
   isFirstTime: boolean;
-  publicKey: string | null;    // Base64 ECDSA public key
-  encryptionKey: CryptoKey | null; // AES key derived from PIN (in-memory only)
+  publicKey: string | null;
+  encryptionKey: CryptoKey | null;
   unlock: (pin: string) => Promise<boolean>;
   lock: () => void;
   setPin: (newPin: string) => Promise<void>;
   completeSetup: (pin: string) => Promise<void>;
   getPrivateKey: () => Promise<CryptoKey | null>;
   getPublicKey: () => string | null;
+  getEncryptionKey: () => CryptoKey | null;
 }
 
 export const useSecurityStore = create<SecurityState>((set, get) => ({
@@ -52,7 +55,6 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
 
     const isValid = await verifyPin(pin, storedHash, storedSalt);
     if (isValid) {
-      // Derive AES encryption key from PIN
       const encKey = await deriveEncryptionKey(pin, storedSalt);
       set({ isUnlocked: true, encryptionKey: encKey });
       return true;
@@ -66,7 +68,22 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
     const { hash, salt } = await hashPin(newPin);
     localStorage.setItem("whispernet_pin_hash", hash);
     localStorage.setItem("whispernet_pin_salt", salt);
+
+    // Re-encrypt private key with new AES key
     const encKey = await deriveEncryptionKey(newPin, salt);
+    const oldKey = get().encryptionKey;
+    const encryptedPrivKey = localStorage.getItem("whispernet_private_key_enc");
+
+    if (oldKey && encryptedPrivKey) {
+      try {
+        const plainJwk = await decrypt(oldKey, encryptedPrivKey);
+        const reEncrypted = await encrypt(encKey, plainJwk);
+        localStorage.setItem("whispernet_private_key_enc", reEncrypted);
+      } catch {
+        console.error("[Security] Failed to re-encrypt private key with new PIN");
+      }
+    }
+
     set({ encryptionKey: encKey });
   },
 
@@ -82,10 +99,15 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
     const privKeyJwk = await exportPrivateKey(keyPair.privateKey);
 
     localStorage.setItem("whispernet_public_key", pubKeyB64);
-    localStorage.setItem("whispernet_private_key", privKeyJwk);
 
     // 3. Derive AES encryption key
     const encKey = await deriveEncryptionKey(pin, salt);
+
+    // 4. Encrypt private key before storing
+    const encryptedPrivKey = await encrypt(encKey, privKeyJwk);
+    localStorage.setItem("whispernet_private_key_enc", encryptedPrivKey);
+    // Remove any legacy plaintext key
+    localStorage.removeItem("whispernet_private_key");
 
     set({
       isFirstTime: false,
@@ -96,17 +118,44 @@ export const useSecurityStore = create<SecurityState>((set, get) => ({
   },
 
   getPrivateKey: async () => {
-    const jwkString = localStorage.getItem("whispernet_private_key");
-    if (!jwkString) return null;
-    try {
-      return await importPrivateKey(jwkString);
-    } catch {
-      return null;
+    const encKey = get().encryptionKey;
+
+    // Try encrypted key first (new format)
+    const encryptedJwk = localStorage.getItem("whispernet_private_key_enc");
+    if (encryptedJwk && encKey) {
+      try {
+        const jwkString = await decrypt(encKey, encryptedJwk);
+        return await importPrivateKey(jwkString);
+      } catch {
+        console.error("[Security] Failed to decrypt private key");
+        return null;
+      }
     }
+
+    // Fallback to legacy plaintext key (migrate it)
+    const legacyJwk = localStorage.getItem("whispernet_private_key");
+    if (legacyJwk && encKey) {
+      try {
+        const key = await importPrivateKey(legacyJwk);
+        // Migrate: encrypt and save in new format
+        const encrypted = await encrypt(encKey, legacyJwk);
+        localStorage.setItem("whispernet_private_key_enc", encrypted);
+        localStorage.removeItem("whispernet_private_key");
+        return key;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   },
 
   getPublicKey: () => {
     return get().publicKey || localStorage.getItem("whispernet_public_key");
+  },
+
+  getEncryptionKey: () => {
+    return get().encryptionKey;
   },
 }));
 
@@ -139,6 +188,20 @@ export const useMessageStore = create<MessageState>((set) => ({
   fetchMessages: async () => {
     try {
       const dbMessages = await getMessages();
+      // Decrypt message content at rest
+      const encKey = useSecurityStore.getState().encryptionKey;
+      if (encKey) {
+        for (const msg of dbMessages) {
+          if (msg.encrypted && msg.content) {
+            try {
+              msg.content = await decrypt(encKey, msg.content);
+              msg.encrypted = false; // mark as decrypted for display
+            } catch {
+              msg.content = "[Encrypted — unable to decrypt]";
+            }
+          }
+        }
+      }
       set({ messages: dbMessages });
     } catch (error) {
       console.error("Failed to fetch messages from DB:", error);
@@ -159,11 +222,25 @@ export const useMessageStore = create<MessageState>((set) => ({
         msg.senderPublicKey = publicKey;
       }
 
-      await createMessage(msg);
+      // Encrypt content before storing in IndexedDB
+      const encKey = securityStore.encryptionKey;
+      const plaintextContent = msg.content;
+      if (encKey) {
+        const storageMsg = { ...msg };
+        storageMsg.content = await encrypt(encKey, msg.content);
+        storageMsg.encrypted = true;
+        await createMessage(storageMsg);
+      } else {
+        await createMessage(msg);
+      }
 
+      // Keep plaintext in memory for the UI
+      msg.encrypted = false;
       set((state) => ({ messages: [...state.messages, msg] }));
-      toast.success("Message signed & saved");
+      toast.success("Message signed & encrypted");
 
+      // Broadcast the plaintext version (WebRTC handles transit encryption)
+      msg.content = plaintextContent;
       try {
         await broadcastMessage(msg);
       } catch (broadcastErr) {

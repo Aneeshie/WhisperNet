@@ -1,8 +1,8 @@
 import Peer, { type DataConnection } from "peerjs";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
-import { useNetworkStore, useMessageStore } from "@/store";
-import { verifySignature, getSignablePayload } from "@/privacy/crypto";
+import { useNetworkStore, useMessageStore, useSecurityStore } from "@/store";
+import { verifySignature, getSignablePayload, encrypt } from "@/privacy/crypto";
 
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
@@ -261,17 +261,29 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
     msg.trusted = false;
   }
 
-  // 4. Save and update UI
+  // 4. Encrypt content before storing, keep plaintext for UI + relay
+  const plaintextContent = msg.content;
   try {
-    await createMessage(msg);
+    const encKey = useSecurityStore.getState().encryptionKey;
+    if (encKey) {
+      const storageMsg = { ...msg };
+      storageMsg.content = await encrypt(encKey, msg.content);
+      storageMsg.encrypted = true;
+      await createMessage(storageMsg);
+    } else {
+      await createMessage(msg);
+    }
+    // Keep plaintext in memory for the UI
+    msg.encrypted = false;
     existing.push(msg);
     useMessageStore.setState({ messages: [...existing] });
   } catch (e) {
     console.error("Failed to save incoming message", e);
-    return; // Stop processing and don't relay if save failed
+    return;
   }
   
-  // 5. Relay the message (Flooding algorithm)
+  // 5. Relay the plaintext message (WebRTC handles transit encryption)
+  msg.content = plaintextContent;
   if (shouldRelay) {
     await broadcastMessage(msg);
   }

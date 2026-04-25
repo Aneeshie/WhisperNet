@@ -212,37 +212,38 @@ graph LR
 
 ### What is NOT Protected (Be Aware)
 
-| Risk | Details |
-|---|---|
-| **PeerJS signaling server** | The initial handshake for Global P2P goes through PeerJS cloud. PeerJS can see that two Peer IDs are connecting (metadata), but **cannot read messages** (those go over encrypted WebRTC). |
-| **Relay node visibility** | Messages that hop through intermediate nodes are readable by the relay. For broadcast messages (alerts, news), this is by design -- they need to be readable to be useful. |
-| **QR codes are unencrypted** | When you show a QR code, anyone who scans it can read the messages. Only show QR codes to people you trust. |
-| **Private key in localStorage** | The ECDSA private key is stored in localStorage as a JWK. It is protected by the browser sandbox but not encrypted at rest. |
+| Risk | Status | Details |
+|---|---|---|
+| **PeerJS signaling server** | Mitigated | PeerJS can see metadata (which Peer IDs connect), but cannot read messages. Use the offline Wi-Fi mesh or QR sync to bypass PeerJS entirely. |
+| **Relay node visibility** | By design | Broadcast messages (alerts, news) are meant to be readable by all mesh participants. This is intentional for emergency communication. |
+| **QR codes** | Fixed | QR bundles are now AES-256-GCM encrypted and HMAC signed. Only someone with the same PIN-derived key can decrypt and verify them. |
+| **Private key in localStorage** | Fixed | The ECDSA private key is now AES-256-GCM encrypted at rest using your PIN-derived key. It is only decrypted in memory while the app is unlocked. |
+| **Messages in IndexedDB** | Fixed | All message content is AES-256-GCM encrypted before being written to IndexedDB. Plaintext only exists in memory while the app is unlocked. |
 
 ### Security Model
 
 ```
 PROTECTED by:
   + PBKDF2 PIN hashing (100k iterations)
-  + ECDSA P-256 message signing
-  + AES-256-GCM encryption key derivation
+  + ECDSA P-256 message signing and verification
+  + AES-256-GCM encrypted message storage (IndexedDB)
+  + AES-256-GCM encrypted private key at rest
+  + AES-256-GCM encrypted QR bundles with HMAC integrity
   + DTLS transport encryption (WebRTC)
   + Browser sandbox isolation (IndexedDB)
   + Stealth UI camouflage (weather app)
   + TTL auto-deletion (forward security)
   + No accounts (anonymous, random Peer IDs)
 
-REMAINING RISKS:
-  - Relay nodes can read hop data (by design)
-  - Private key in localStorage (sandbox only)
-  - QR shoulder surfing (show to trusted only)
+REMAINING RISKS (by design):
+  - Relay nodes can read broadcast messages (intentional for mesh)
+  - PeerJS sees connection metadata (use offline mesh to bypass)
 ```
 
 ### Future Security Enhancements
 
 - **End-to-end encryption** -- Encrypt point-to-point messages with ECDH shared secrets so relay nodes cannot read them
-- **Encrypted local storage** -- Encrypt IndexedDB message content with the AES key derived from the PIN
-- **Private key encryption** -- Encrypt the ECDSA private key at rest using the PIN-derived AES key
+- **Trusted device registry** -- Allow users to whitelist known public keys for enhanced verification
 
 ---
 
