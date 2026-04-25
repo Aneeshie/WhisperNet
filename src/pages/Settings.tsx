@@ -1,15 +1,17 @@
 import { useState, useRef } from "react";
-import { useUIStore, useMessageStore } from "@/store";
+import { useUIStore, useMessageStore, useNetworkStore } from "@/store";
 import { toast } from "sonner";
 import { db } from "@/db/db";
 import { createMessage, deleteExpiredMessages } from "@/db/messages";
 import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType } from "@/types/message";
+import { Smartphone, Trash2, Sparkles, Clock, ChevronRight } from "lucide-react";
 
 export default function Settings() {
   const { isNavigating, setNavigating } = useUIStore();
   const { fetchMessages } = useMessageStore();
-  
+  const { myPeerId } = useNetworkStore();
+
   // Stealth Dev Mode State
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const tapCountRef = useRef(0);
@@ -26,10 +28,9 @@ export default function Settings() {
 
     if (tapCountRef.current >= 5) {
       setDevModeEnabled(true);
-      toast.success("Developer Mode Unlocked");
+      toast.success("Developer tools unlocked");
       tapCountRef.current = 0;
     } else {
-      // Reset tap counter if they don't tap again within 500ms
       tapTimeoutRef.current = setTimeout(() => {
         tapCountRef.current = 0;
       }, 500);
@@ -57,10 +58,10 @@ export default function Settings() {
         await createMessage(msg);
       }
       await fetchMessages();
-      toast.success("50 dummy messages generated successfully!");
+      toast.success("50 test messages generated");
     } catch (error) {
       console.error("handleGenerateMessages error:", error);
-      toast.error("Failed to generate dummy messages.");
+      toast.error("Failed to generate messages");
     }
   };
 
@@ -68,10 +69,10 @@ export default function Settings() {
     try {
       await db.messages.clear();
       await fetchMessages();
-      toast.warning("Database cleared completely.");
+      toast.warning("All messages deleted");
     } catch (error) {
       console.error("handleClearDatabase error:", error);
-      toast.error("Failed to clear database.");
+      toast.error("Failed to clear database");
     }
   };
 
@@ -79,78 +80,97 @@ export default function Settings() {
     try {
       await deleteExpiredMessages();
       await fetchMessages();
-      toast.info("TTL Cleanup triggered successfully.");
+      toast.info("Expired messages cleaned up");
     } catch (error) {
       console.error("handleTTL error:", error);
-      toast.error("Failed to run TTL cleanup.");
+      toast.error("Failed to clean up");
     }
   };
 
   return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      <header className="py-4 border-b border-zinc-900">
-        <h1 className="text-xl font-bold tracking-tight">Node Settings</h1>
-        <p 
-          className="text-xs font-mono text-zinc-500 mt-1 select-none active:text-zinc-400"
+    <div className="flex flex-col h-full animate-fade-in-up">
+      <header className="px-5 pt-6 pb-4">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p
+          className="text-xs text-zinc-500 mt-1 select-none active:text-zinc-400"
           onClick={handleSecretTap}
         >
-          LOCAL_CONFIG: ACTIVE
+          Manage your device and preferences
         </p>
       </header>
-      
-      <div className="flex-1 space-y-6 mt-4 pb-8">
-        <div className="space-y-2">
-          <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Identity</h2>
-          <div className="bg-zinc-900/30 p-3 rounded border border-zinc-800 flex justify-between items-center">
-            <span className="text-sm font-mono text-zinc-400">NODE_ID</span>
-            <span className="text-sm font-mono text-zinc-100">usr_8f92a1b</span>
+
+      <div className="flex-1 px-5 space-y-4 pb-8">
+
+        {/* Device Info */}
+        <div className="glass-card overflow-hidden">
+          <div className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <Smartphone className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-zinc-300">Your Device</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {myPeerId ? (
+                  <>ID: <span className="text-zinc-400 font-semibold select-all">{myPeerId}</span></>
+                ) : (
+                  "Not connected to mesh"
+                )}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-zinc-700" />
           </div>
         </div>
 
-        <div className="space-y-2">
-          <h2 className="text-xs font-mono text-zinc-500 uppercase tracking-widest">State Verification (Dev)</h2>
-          <div className="bg-zinc-900/30 p-3 rounded border border-zinc-800 flex justify-between items-center">
-            <span className="text-sm font-mono text-zinc-400">ZUSTAND_STORE</span>
-            <button 
+        {/* Debug Mode (always visible but simple) */}
+        <div className="glass-card overflow-hidden">
+          <div className="p-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-300">Debug Mode</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Toggle navigation state for testing</p>
+            </div>
+            <button
               onClick={() => setNavigating(!isNavigating)}
-              className={`text-xs font-mono px-2 py-1 rounded border transition-colors ${
-                isNavigating 
-                  ? 'border-green-900/50 bg-green-950/20 text-green-500' 
-                  : 'border-zinc-700 bg-zinc-800 text-zinc-300'
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+                isNavigating
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "bg-white/5 text-zinc-500"
               }`}
             >
-              NAVIGATING: {isNavigating ? 'TRUE' : 'FALSE'}
+              {isNavigating ? "On" : "Off"}
             </button>
           </div>
         </div>
 
+        {/* Dev Tools Panel */}
         {devModeEnabled && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <h2 className="text-xs font-mono text-amber-500 uppercase tracking-widest flex items-center space-x-2">
-              <span>Dev Tools Panel</span>
+          <div className="space-y-2 animate-fade-in-up">
+            <h2 className="text-xs font-medium text-amber-400/80 uppercase tracking-wider px-1 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Developer Tools
             </h2>
-            <div className="bg-zinc-950 p-3 rounded-md border border-amber-900/50 flex flex-col space-y-3">
-              <p className="text-xs font-mono text-zinc-500">DEXIE_JS_CONTROLS</p>
-              
-              <button 
+            <div className="glass-card overflow-hidden border-amber-500/10 divide-y divide-white/5">
+              <button
                 onClick={handleGenerateMessages}
-                className="w-full py-2 bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-mono rounded active:bg-zinc-800 transition-colors"
+                className="w-full p-4 text-left text-sm text-zinc-300 hover:bg-white/3 transition-colors flex items-center gap-3"
               >
-                GENERATE 50 DUMMY MESSAGES
-              </button>
-              
-              <button 
-                onClick={handleTTL}
-                className="w-full py-2 bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-mono rounded active:bg-zinc-800 transition-colors"
-              >
-                TRIGGER TTL CLEANUP
+                <Sparkles className="w-4 h-4 text-zinc-500" />
+                Generate 50 test messages
               </button>
 
-              <button 
-                onClick={handleClearDatabase}
-                className="w-full py-2 bg-red-950/20 border border-red-900/50 text-red-500 text-xs font-mono rounded active:bg-red-900/20 transition-colors"
+              <button
+                onClick={handleTTL}
+                className="w-full p-4 text-left text-sm text-zinc-300 hover:bg-white/3 transition-colors flex items-center gap-3"
               >
-                CLEAR DATABASE
+                <Clock className="w-4 h-4 text-zinc-500" />
+                Clean up expired messages
+              </button>
+
+              <button
+                onClick={handleClearDatabase}
+                className="w-full p-4 text-left text-sm text-red-400/80 hover:bg-red-500/5 transition-colors flex items-center gap-3"
+              >
+                <Trash2 className="w-4 h-4 text-red-500/60" />
+                Delete all messages
               </button>
             </div>
           </div>
