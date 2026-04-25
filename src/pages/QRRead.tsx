@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { useEffect } from "react";
 import { importBundle } from "@/qr/importBundle";
 import { useUIStore } from "@/store";
 
@@ -23,7 +25,7 @@ function ScannerComponent({ onScan, onChunkScan }: { onScan: (text: string) => v
           { fps: 10, aspectRatio: 1.0 },
           (decodedText) => {
             if (hasScanned) return;
-            
+
             const match = decodedText.match(/^\[(\d+)\/(\d+)\](.*)/);
             if (match) {
               const index = parseInt(match[1], 10);
@@ -42,9 +44,9 @@ function ScannerComponent({ onScan, onChunkScan }: { onScan: (text: string) => v
                 for (let i = 1; i <= total; i++) {
                   fullPayload += accumulatedChunks.current[i];
                 }
-                
+
                 onScan(fullPayload);
-                
+
                 if (scannerRef.current && scannerRef.current.isScanning) {
                   scannerRef.current.stop().then(() => {
                     scannerRef.current?.clear();
@@ -55,7 +57,7 @@ function ScannerComponent({ onScan, onChunkScan }: { onScan: (text: string) => v
               // Backward compatibility for unchunked payloads
               hasScanned = true; // Lock immediately to prevent double fires
               onScan(decodedText);
-              
+
               if (scannerRef.current && scannerRef.current.isScanning) {
                 scannerRef.current.stop().then(() => {
                   scannerRef.current?.clear();
@@ -63,7 +65,7 @@ function ScannerComponent({ onScan, onChunkScan }: { onScan: (text: string) => v
               }
             }
           },
-          () => {} // ignore frame errors
+          () => { } // ignore frame errors
         );
       } catch (err) {
         console.error("Error starting scanner", err);
@@ -105,7 +107,7 @@ function ScannerComponent({ onScan, onChunkScan }: { onScan: (text: string) => v
 
 export default function QRRead() {
   const [scannedPayload, setScannedPayload] = useState<string | null>(null);
-  const [chunkProgress, setChunkProgress] = useState<{scanned: number, total: number} | null>(null);
+  const [chunkProgress, setChunkProgress] = useState<{ scanned: number, total: number } | null>(null);
   const { fetchMessages } = useUIStore();
 
   const handleScan = async (text: string) => {
@@ -130,7 +132,7 @@ export default function QRRead() {
               {scannedPayload}
             </p>
           </div>
-          <button 
+          <button
             onClick={() => {
               setScannedPayload(null);
               setChunkProgress(null);
@@ -142,18 +144,18 @@ export default function QRRead() {
         </div>
       ) : (
         <div className="flex flex-col items-center space-y-4">
-          <ScannerComponent onScan={handleScan} onChunkScan={(scanned, total) => setChunkProgress({scanned, total})} />
+          <ScannerComponent onScan={handleScan} onChunkScan={(scanned, total) => setChunkProgress({ scanned, total })} />
           {chunkProgress && chunkProgress.total > 1 && (
             <div className="w-full bg-zinc-900/80 border border-zinc-800 p-3 rounded-md text-center shadow-lg animate-in fade-in slide-in-from-bottom-2">
-               <p className="text-xs font-mono text-amber-500 tracking-widest mb-2">
-                 COLLECTING CHUNKS: {chunkProgress.scanned} / {chunkProgress.total}
-               </p>
-               <div className="w-full h-1.5 bg-zinc-950 rounded overflow-hidden">
-                 <div 
-                   className="h-full bg-amber-500 transition-all duration-300 shadow-[0_0_8px_rgba(245,158,11,0.5)]" 
-                   style={{ width: `${(chunkProgress.scanned / chunkProgress.total) * 100}%` }}
-                 />
-               </div>
+              <p className="text-xs font-mono text-amber-500 tracking-widest mb-2">
+                COLLECTING CHUNKS: {chunkProgress.scanned} / {chunkProgress.total}
+              </p>
+              <div className="w-full h-1.5 bg-zinc-950 rounded overflow-hidden">
+                <div
+                  className="h-full bg-amber-500 transition-all duration-300 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  style={{ width: `${(chunkProgress.scanned / chunkProgress.total) * 100}%` }}
+                />
+              </div>
             </div>
           )}
         </div>
