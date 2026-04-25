@@ -15,4 +15,9 @@ export interface Message {
   maxHopCount: number;
   regionTag?: string;
   trusted?: boolean;
+
+  // Crypto fields
+  signature?: string;        // ECDSA signature over id:content:createdAt
+  senderPublicKey?: string;  // Sender's exported ECDSA public key (base64)
+  encrypted?: boolean;       // Whether content is AES-encrypted at rest
 }

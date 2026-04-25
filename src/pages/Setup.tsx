@@ -19,13 +19,13 @@ export default function Setup() {
     setStep(2);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (confirmPin !== pin) {
       setError("PINs don't match. Try again.");
       setConfirmPin("");
       return;
     }
-    completeSetup(pin);
+    await completeSetup(pin);
   };
 
   return (
