@@ -2,13 +2,17 @@ import { defineConfig } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import path from "path"
 import { VitePWA } from 'vite-plugin-pwa'
-
-
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    // Listen on LAN so phones/tablets can load the app from https://<your-pc-ip>:5173
+    host: true,
+  },
   plugins: [
+    basicSsl(),
     react(),
     babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),

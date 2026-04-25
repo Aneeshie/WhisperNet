@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import type { Message } from "@/types/message";
 import { createMessage, getMessages } from "@/db/messages";
+import { broadcastMessage } from "@/sync/mesh";
 
 interface UIState {
   isNavigating: boolean;
@@ -9,12 +10,24 @@ interface UIState {
   messages: Message[];
   fetchMessages: () => Promise<void>;
   addMessage: (msg: Message) => Promise<void>;
+  peerCount: number;
+  myPeerId: string | null;
+  setPeerCount: (count: number) => void;
+  setMyPeerId: (id: string) => void;
+  addPeer: () => void;
+  removePeer: () => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   isNavigating: false,
   setNavigating: (state) => set({ isNavigating: state }),
   messages: [],
+  peerCount: 0,
+  myPeerId: null,
+  setPeerCount: (count) => set({ peerCount: count }),
+  setMyPeerId: (id) => set({ myPeerId: id }),
+  addPeer: () => set({ peerCount: get().peerCount + 1 }),
+  removePeer: () => set({ peerCount: Math.max(0, get().peerCount - 1) }),
   fetchMessages: async () => {
     try {
       const dbMessages = await getMessages();
@@ -28,6 +41,9 @@ export const useUIStore = create<UIState>((set) => ({
     try {
       await createMessage(msg);
       toast.success("Message persisted to local mesh DB");
+
+      // Broadcast to WebRTC peers
+      await broadcastMessage(msg);
 
       // Re-fetch to ensure store and DB are perfectly in sync
       const dbMessages = await getMessages();
