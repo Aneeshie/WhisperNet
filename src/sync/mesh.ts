@@ -1,10 +1,14 @@
 import Peer, { type DataConnection } from "peerjs";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
-import { useUIStore } from "@/store";
+import { useNetworkStore, useMessageStore } from "@/store";
 
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
+
+export function getOnlinePeerCount(): number {
+  return connections.size;
+}
 
 const knownPeers = new Set<string>(JSON.parse(localStorage.getItem("whispernet_peers") || "[]"));
 
@@ -36,7 +40,7 @@ function setupPeerEvents(p: Peer) {
   p.on("open", (id) => {
     console.log(`[Mesh] Connected to global signaling server. My ID: ${id}`);
     localStorage.setItem("whispernet_my_id", id);
-    useUIStore.getState().setMyPeerId(id);
+    useNetworkStore.getState().setMyPeerId(id);
     startAutoReconnect();
   });
 
@@ -138,7 +142,7 @@ function setupConnection(conn: DataConnection) {
     toast.success(`Connected to Peer!`, { id: `dial-${conn.peer}` });
     console.log(`[Mesh] DataChannel open with ${conn.peer}`);
     connections.set(conn.peer, conn);
-    useUIStore.getState().setPeerCount(connections.size);
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
 
     knownPeers.add(conn.peer);
     saveKnownPeers();
@@ -147,7 +151,7 @@ function setupConnection(conn: DataConnection) {
     conn.send(JSON.stringify({ type: "sync_req" }));
 
     // --- SILENT OFFLINE TUNNEL BOOTSTRAPPING ---
-    const myId = useUIStore.getState().myPeerId;
+    const myId = useNetworkStore.getState().myPeerId;
     if (myId && myId > conn.peer) {
       try {
         console.log(`[Offline Mesh] Bootstrapping silent host tunnel for ${conn.peer}...`);
@@ -165,7 +169,16 @@ function setupConnection(conn: DataConnection) {
 
       if ((parsed as any).type === "sync_req") {
         const myMessages = await getMessages();
-        conn.send(JSON.stringify({ type: "sync_res", messages: myMessages }));
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
+          const batch = myMessages.slice(i, i + BATCH_SIZE);
+          try {
+            conn.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          } catch (err) {
+            console.error(`[Mesh] Failed to send sync_res batch ${i}`, err);
+          }
+          await new Promise(r => setTimeout(r, 50));
+        }
       } else if ((parsed as any).type === "sync_res") {
         for (const msg of (parsed as any).messages) {
           await processIncomingMessage(msg, false); // DO NOT RELAY historical sync
@@ -189,7 +202,7 @@ function setupConnection(conn: DataConnection) {
     pendingConnections.delete(conn.peer);
     console.log(`[Mesh] DataChannel closed with ${conn.peer}`);
     connections.delete(conn.peer);
-    useUIStore.getState().setPeerCount(connections.size);
+    useNetworkStore.getState().setPeerCount(connections.size);
   });
 
   conn.on("error", (err) => {
@@ -202,7 +215,8 @@ import {
   broadcastOfflineMessage,
   generateHostOffer,
   processJoinerOfferAndGenerateAnswer,
-  finalizeHostConnection
+  finalizeHostConnection,
+  offlineDataChannels
 } from "./offlineMesh";
 
 // In-memory cache for instant synchronous deduplication to prevent async race conditions
@@ -234,8 +248,14 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
   }
 
   // 3. Save and update UI
-  await createMessage(msg);
-  useUIStore.setState({ messages: await getMessages() });
+  try {
+    await createMessage(msg);
+    existing.push(msg);
+    useMessageStore.setState({ messages: [...existing] });
+  } catch (e) {
+    console.error("Failed to save incoming message", e);
+    return; // Stop processing and don't relay if save failed
+  }
   
   // 4. Relay the message (Flooding algorithm)
   if (shouldRelay) {
@@ -249,6 +269,6 @@ export function leaveMesh() {
     peer = null;
   }
   connections.clear();
-  useUIStore.getState().setPeerCount(0);
-  useUIStore.getState().setMyPeerId("");
+  useNetworkStore.getState().setPeerCount(0);
+  useNetworkStore.getState().setMyPeerId("");
 }

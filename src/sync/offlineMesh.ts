@@ -1,8 +1,8 @@
 import { strToU8, compressSync, decompressSync, strFromU8 } from "fflate";
 import { getMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
-import { useUIStore } from "@/store";
-import { processIncomingMessage } from "./mesh";
+import { useNetworkStore } from "@/store";
+import { processIncomingMessage, getOnlinePeerCount } from "./mesh";
 
 export const offlineDataChannels = new Map<string, RTCDataChannel>();
 
@@ -57,10 +57,14 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
       .catch(reject);
 
     setTimeout(() => {
-      if (pc.iceGatheringState !== "complete" && pc.localDescription) {
-        resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
+      if (pc.iceGatheringState !== "complete") {
+        if (pc.localDescription) {
+          resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
+        } else {
+          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+        }
       }
-    }, 2000);
+    }, 5000); // Increased from 2000ms to 5000ms to ensure candidates are gathered
   });
 }
 
@@ -68,7 +72,11 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
 export async function processJoinerOfferAndGenerateAnswer(compressedOffer: string): Promise<string> {
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
 
-  const pc = new RTCPeerConnection({ iceServers: [] });
+  const pc = new RTCPeerConnection({ 
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }
+    ] 
+  });
   activeOfflinePCs.push(pc);
 
   pc.ondatachannel = (event) => {
@@ -92,10 +100,14 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
       .catch(reject);
 
     setTimeout(() => {
-      if (pc.iceGatheringState !== "complete" && pc.localDescription) {
-        resolve(compressSDP(JSON.stringify(pc.localDescription)));
+      if (pc.iceGatheringState !== "complete") {
+        if (pc.localDescription) {
+          resolve(compressSDP(JSON.stringify(pc.localDescription)));
+        } else {
+          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+        }
       }
-    }, 2000);
+    }, 5000); // Increased from 2000ms to 5000ms
   });
 }
 
@@ -121,10 +133,14 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
     if (offlineDataChannels.has(id)) return;
     console.log(`[Offline Mesh] DataChannel open with ${id}`);
     offlineDataChannels.set(id, dc);
-    useUIStore.getState().setPeerCount(useUIStore.getState().peerCount + 1);
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
 
     // Request sync
-    dc.send(JSON.stringify({ type: "sync_req" }));
+    try {
+      dc.send(JSON.stringify({ type: "sync_req" }));
+    } catch (err) {
+      console.error("Failed to send sync_req", err);
+    }
   };
 
   if (dc.readyState === "open") {
@@ -139,13 +155,24 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
 
       if (parsed.type === "sync_req") {
         const myMessages = await getMessages();
-        dc.send(JSON.stringify({ type: "sync_res", messages: myMessages }));
+        // Send messages in small batches to avoid WebRTC DataChannel message size limits
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
+          const batch = myMessages.slice(i, i + BATCH_SIZE);
+          try {
+            dc.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          } catch (err) {
+            console.error("Failed to send sync_res batch", err);
+          }
+          // Sleep slightly to prevent buffer overflow on the DataChannel
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
       } else if (parsed.type === "sync_res") {
         for (const msg of parsed.messages) {
-          processIncomingMessage(msg, false); // DO NOT RELAY
+          await processIncomingMessage(msg, false); // DO NOT RELAY
         }
       } else if (parsed.type === "broadcast") {
-        processIncomingMessage(parsed.message, true); // RELAY
+        await processIncomingMessage(parsed.message, true); // RELAY
       }
     } catch (e) {
       console.error("[Offline Mesh] Parse error", e);
@@ -155,7 +182,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
   dc.onclose = () => {
     console.log(`[Offline Mesh] DataChannel closed with ${id}`);
     offlineDataChannels.delete(id);
-    useUIStore.getState().setPeerCount(Math.max(0, useUIStore.getState().peerCount - 1));
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
   };
 }
 

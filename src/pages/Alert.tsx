@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useUIStore } from "@/store";
+import { useMessageStore } from "@/store";
 import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType, Priority } from "@/types/message";
 
 export default function Alert() {
   const navigate = useNavigate();
-  const { addMessage } = useUIStore();
+  const { addMessage } = useMessageStore();
   
   const [content, setContent] = useState("");
   const [type, setType] = useState<MessageType>("alert");

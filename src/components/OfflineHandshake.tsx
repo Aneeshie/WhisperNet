@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import QRCode from "qrcode";
+import { useState } from "react";
 import { Scanner } from "./Scanner";
+import { AnimatedQR } from "./AnimatedQR";
 import { generateHostOffer, processJoinerOfferAndGenerateAnswer, finalizeHostConnection } from "@/sync/offlineMesh";
 import { X, WifiOff } from "lucide-react";
 
@@ -9,24 +9,11 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState(1);
   const [offerId, setOfferId] = useState<string>("");
   const [qrData, setQrData] = useState<string>("");
-  const [qrSrc, setQrSrc] = useState<string>("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (qrData) {
-      QRCode.toDataURL(qrData, {
-        width: 800,
-        margin: 2,
-        errorCorrectionLevel: "L",
-        color: { dark: "#ffffff", light: "#000000" }
-      })
-        .then(setQrSrc)
-        .catch(console.error);
-    }
-  }, [qrData]);
-
   const handleStartHost = async () => {
+    setError("");
     setMode("HOST");
     setStep(1);
     setLoading(true);
@@ -42,11 +29,13 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   };
 
   const handleStartJoin = () => {
+    setError("");
     setMode("JOIN");
     setStep(1);
   };
 
   const handleJoinScan = async (scanned: string) => {
+    setError("");
     setLoading(true);
     try {
       const answerStr = await processJoinerOfferAndGenerateAnswer(scanned);
@@ -60,6 +49,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   };
 
   const handleHostScan = async (scanned: string) => {
+    setError("");
     setLoading(true);
     try {
       await finalizeHostConnection(scanned, offerId);
@@ -125,19 +115,19 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
 
               {step === 1 && (
                 <>
-                  <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
-                    {loading || !qrSrc ? (
+                  {loading || !qrData ? (
+                    <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
                       <p className="text-xs font-mono text-zinc-500 animate-pulse">GENERATING OFFER...</p>
-                    ) : (
-                      <img src={qrSrc} className="w-full h-full object-contain" style={{ imageRendering: "pixelated" }} alt="Host Offer" />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <AnimatedQR payload={qrData} />
+                  )}
                   <p className="text-xs text-center text-zinc-400 font-mono mt-4">
-                    Have the other device scan this QR code to initiate the handshake.
+                    Have the other device scan this animated QR sequence to initiate the handshake.
                   </p>
                   <button
                     onClick={() => setStep(2)}
-                    disabled={!qrSrc}
+                    disabled={!qrData}
                     className="w-full bg-blue-900/80 hover:bg-blue-800 text-blue-100 py-3 rounded-lg font-mono text-xs tracking-widest font-bold disabled:opacity-50 mt-4"
                   >
                     NEXT: SCAN THEIR ANSWER
@@ -168,15 +158,15 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
 
               {step === 2 && (
                 <>
-                  <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
-                    {loading || !qrSrc ? (
+                  {loading || !qrData ? (
+                    <div className="w-80 h-80 bg-zinc-900 rounded-lg flex items-center justify-center border-2 border-dashed border-zinc-700 p-2">
                       <p className="text-xs font-mono text-zinc-500 animate-pulse">GENERATING ANSWER...</p>
-                    ) : (
-                      <img src={qrSrc} className="w-full h-full object-contain" style={{ imageRendering: "pixelated" }} alt="Joiner Answer" />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <AnimatedQR payload={qrData} />
+                  )}
                   <p className="text-xs text-center text-zinc-400 font-mono mt-4">
-                    Show this QR code back to the Host. Once scanned, the connection will be established!
+                    Show this animated QR sequence back to the Host. Once scanned, the connection will be established!
                   </p>
                 </>
               )}

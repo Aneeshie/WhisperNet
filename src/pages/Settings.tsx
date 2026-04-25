@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useUIStore } from "@/store";
+import { useUIStore, useMessageStore } from "@/store";
 import { toast } from "sonner";
 import { db } from "@/db/db";
 import { createMessage, deleteExpiredMessages } from "@/db/messages";
@@ -7,7 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType } from "@/types/message";
 
 export default function Settings() {
-  const { isNavigating, setNavigating, fetchMessages } = useUIStore();
+  const { isNavigating, setNavigating } = useUIStore();
+  const { fetchMessages } = useMessageStore();
   
   // Stealth Dev Mode State
   const [devModeEnabled, setDevModeEnabled] = useState(false);
@@ -58,6 +59,7 @@ export default function Settings() {
       await fetchMessages();
       toast.success("50 dummy messages generated successfully!");
     } catch (error) {
+      console.error("handleGenerateMessages error:", error);
       toast.error("Failed to generate dummy messages.");
     }
   };
@@ -68,6 +70,7 @@ export default function Settings() {
       await fetchMessages();
       toast.warning("Database cleared completely.");
     } catch (error) {
+      console.error("handleClearDatabase error:", error);
       toast.error("Failed to clear database.");
     }
   };
@@ -78,6 +81,7 @@ export default function Settings() {
       await fetchMessages();
       toast.info("TTL Cleanup triggered successfully.");
     } catch (error) {
+      console.error("handleTTL error:", error);
       toast.error("Failed to run TTL cleanup.");
     }
   };
