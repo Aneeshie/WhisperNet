@@ -34,10 +34,15 @@ const pendingConnections = new Map<string, { pc: RTCPeerConnection, dc: RTCDataC
 
 // Step 1: Host generates an Offer
 export async function generateHostOffer(): Promise<{ offer: string, offerId: string }> {
-  const pc = new RTCPeerConnection({ iceServers: [] }); // 100% offline
+  const pc = new RTCPeerConnection({ 
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" }
+    ] 
+  });
   activeOfflinePCs.push(pc);
   
   const dc = pc.createDataChannel("offline-mesh");
+  activeOfflineDCs.push(dc);
   const offerId = Math.random().toString(36).substring(2, 10);
   pendingConnections.set(offerId, { pc, dc });
 
@@ -80,6 +85,7 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
   activeOfflinePCs.push(pc);
 
   pc.ondatachannel = (event) => {
+    activeOfflineDCs.push(event.channel);
     setupOfflineDataChannel(event.channel);
   };
 
@@ -123,8 +129,9 @@ export async function finalizeHostConnection(compressedAnswer: string, offerId: 
   pendingConnections.delete(offerId);
 }
 
-// Global array to prevent garbage collection of RTCPeerConnections
+// Global array to prevent garbage collection of RTCPeerConnections and RTCDataChannels
 const activeOfflinePCs: RTCPeerConnection[] = [];
+const activeOfflineDCs: RTCDataChannel[] = [];
 
 function setupOfflineDataChannel(dc: RTCDataChannel) {
   const id = Math.random().toString(36).substring(2, 9);
