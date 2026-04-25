@@ -59,6 +59,7 @@ export default function Settings() {
       await fetchMessages();
       toast.success("50 dummy messages generated successfully!");
     } catch (error) {
+      console.error("handleGenerateMessages error:", error);
       toast.error("Failed to generate dummy messages.");
     }
   };
@@ -69,6 +70,7 @@ export default function Settings() {
       await fetchMessages();
       toast.warning("Database cleared completely.");
     } catch (error) {
+      console.error("handleClearDatabase error:", error);
       toast.error("Failed to clear database.");
     }
   };
@@ -79,6 +81,7 @@ export default function Settings() {
       await fetchMessages();
       toast.info("TTL Cleanup triggered successfully.");
     } catch (error) {
+      console.error("handleTTL error:", error);
       toast.error("Failed to run TTL cleanup.");
     }
   };

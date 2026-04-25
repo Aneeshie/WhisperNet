@@ -1,8 +1,9 @@
 export function splitPayload(payload: string, maxChunkSize: number = 200): string[] {
   const chunks: string[] = [];
+  const chars = Array.from(payload);
   let i = 0;
-  while (i < payload.length) {
-    chunks.push(payload.substring(i, i + maxChunkSize));
+  while (i < chars.length) {
+    chunks.push(chars.slice(i, i + maxChunkSize).join(''));
     i += maxChunkSize;
   }
   
@@ -15,7 +16,7 @@ export function assembleChunks(chunks: string[]): string {
   if (!chunks || chunks.length === 0) return "";
   
   const parsedChunks = chunks.map((c) => {
-    const match = c.match(/^\[(\d+)\/(\d+)\](.*)/);
+    const match = c.match(/^\[(\d+)\/(\d+)\]([\s\S]*)/);
     if (!match) throw new Error("Invalid chunk format");
     return {
       index: parseInt(match[1], 10),

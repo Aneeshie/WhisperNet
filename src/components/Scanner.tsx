@@ -10,6 +10,11 @@ export function Scanner({ onScan }: { onScan: (text: string) => void }) {
   const expectedTotal = useRef<number | null>(null);
   const [progress, setProgress] = useState<{ scanned: number, total: number } | null>(null);
 
+  const onScanRef = useRef(onScan);
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
   useEffect(() => {
     let hasCompleted = false;
     const html5Qrcode = new Html5Qrcode("qr-reader-container", {
@@ -36,6 +41,11 @@ export function Scanner({ onScan }: { onScan: (text: string) => void }) {
               const index = parseInt(match[1], 10);
               const total = parseInt(match[2], 10);
               
+              if (expectedTotal.current !== null && expectedTotal.current !== total) {
+                accumulatedChunks.current = {};
+                setProgress(null);
+              }
+              
               expectedTotal.current = total;
               accumulatedChunks.current[index] = decodedText; // store raw chunk with header for assembleChunks
 
@@ -48,7 +58,7 @@ export function Scanner({ onScan }: { onScan: (text: string) => void }) {
                 try {
                   const fullPayload = assembleChunks(Object.values(accumulatedChunks.current));
                   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                  onScan(fullPayload);
+                  onScanRef.current(fullPayload);
                 } catch (e) {
                   console.error("Failed to assemble chunks", e);
                   // Reset and retry if failed
@@ -68,7 +78,7 @@ export function Scanner({ onScan }: { onScan: (text: string) => void }) {
               // Not a chunked payload, just a regular QR string
               hasCompleted = true;
               if (navigator.vibrate) navigator.vibrate([200]);
-              onScan(decodedText);
+              onScanRef.current(decodedText);
               
               if (scannerRef.current && scannerRef.current.isScanning) {
                 scannerRef.current.stop().then(() => {
@@ -94,7 +104,7 @@ export function Scanner({ onScan }: { onScan: (text: string) => void }) {
         }).catch(console.error);
       }
     };
-  }, [onScan]);
+  }, []);
 
   return (
     <div className="flex flex-col items-center w-full space-y-4">

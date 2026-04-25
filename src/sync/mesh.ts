@@ -6,6 +6,10 @@ import { useNetworkStore, useMessageStore } from "@/store";
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
 
+export function getOnlinePeerCount(): number {
+  return connections.size;
+}
+
 const knownPeers = new Set<string>(JSON.parse(localStorage.getItem("whispernet_peers") || "[]"));
 
 function saveKnownPeers() {
@@ -138,7 +142,7 @@ function setupConnection(conn: DataConnection) {
     toast.success(`Connected to Peer!`, { id: `dial-${conn.peer}` });
     console.log(`[Mesh] DataChannel open with ${conn.peer}`);
     connections.set(conn.peer, conn);
-    useNetworkStore.getState().setPeerCount(connections.size);
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
 
     knownPeers.add(conn.peer);
     saveKnownPeers();
@@ -168,7 +172,11 @@ function setupConnection(conn: DataConnection) {
         const BATCH_SIZE = 5;
         for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
           const batch = myMessages.slice(i, i + BATCH_SIZE);
-          conn.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          try {
+            conn.send(JSON.stringify({ type: "sync_res", messages: batch }));
+          } catch (err) {
+            console.error(`[Mesh] Failed to send sync_res batch ${i}`, err);
+          }
           await new Promise(r => setTimeout(r, 50));
         }
       } else if ((parsed as any).type === "sync_res") {
@@ -207,7 +215,8 @@ import {
   broadcastOfflineMessage,
   generateHostOffer,
   processJoinerOfferAndGenerateAnswer,
-  finalizeHostConnection
+  finalizeHostConnection,
+  offlineDataChannels
 } from "./offlineMesh";
 
 // In-memory cache for instant synchronous deduplication to prevent async race conditions
@@ -239,8 +248,14 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
   }
 
   // 3. Save and update UI
-  await createMessage(msg);
-  useMessageStore.setState({ messages: await getMessages() });
+  try {
+    await createMessage(msg);
+    existing.push(msg);
+    useMessageStore.setState({ messages: [...existing] });
+  } catch (e) {
+    console.error("Failed to save incoming message", e);
+    return; // Stop processing and don't relay if save failed
+  }
   
   // 4. Relay the message (Flooding algorithm)
   if (shouldRelay) {

@@ -16,7 +16,7 @@ export function AnimatedQR({ payload }: AnimatedQRProps) {
     async function generate() {
       if (!payload) return;
       
-      const chunks = splitPayload(payload, 50); // Drastically reduced density
+      const chunks = splitPayload(payload); // Defaults to 200
       
       try {
         const urls = await Promise.all(
@@ -27,7 +27,7 @@ export function AnimatedQR({ payload }: AnimatedQRProps) {
                 { 
                   width: 800, 
                   margin: 2, 
-                  color: { dark: "#ffffff", light: "#000000" }, 
+                  color: { dark: "#000000", light: "#ffffff" }, 
                   errorCorrectionLevel: "M" 
                 },
                 (err, url) => {
@@ -39,7 +39,10 @@ export function AnimatedQR({ payload }: AnimatedQRProps) {
           })
         );
         
-        if (isMounted) setQrUrls(urls);
+        if (isMounted) {
+          setQrUrls(urls);
+          setCurrentIndex(0);
+        }
       } catch (err) {
         console.error("Failed to generate QR chunks", err);
       }

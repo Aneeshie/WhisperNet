@@ -2,7 +2,7 @@ import { strToU8, compressSync, decompressSync, strFromU8 } from "fflate";
 import { getMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useNetworkStore } from "@/store";
-import { processIncomingMessage } from "./mesh";
+import { processIncomingMessage, getOnlinePeerCount } from "./mesh";
 
 export const offlineDataChannels = new Map<string, RTCDataChannel>();
 
@@ -57,8 +57,12 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
       .catch(reject);
 
     setTimeout(() => {
-      if (pc.iceGatheringState !== "complete" && pc.localDescription) {
-        resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
+      if (pc.iceGatheringState !== "complete") {
+        if (pc.localDescription) {
+          resolve({ offer: compressSDP(JSON.stringify(pc.localDescription)), offerId });
+        } else {
+          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+        }
       }
     }, 5000); // Increased from 2000ms to 5000ms to ensure candidates are gathered
   });
@@ -96,8 +100,12 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
       .catch(reject);
 
     setTimeout(() => {
-      if (pc.iceGatheringState !== "complete" && pc.localDescription) {
-        resolve(compressSDP(JSON.stringify(pc.localDescription)));
+      if (pc.iceGatheringState !== "complete") {
+        if (pc.localDescription) {
+          resolve(compressSDP(JSON.stringify(pc.localDescription)));
+        } else {
+          reject(new Error("Timeout waiting for ICE gathering: no local description available"));
+        }
       }
     }, 5000); // Increased from 2000ms to 5000ms
   });
@@ -125,7 +133,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
     if (offlineDataChannels.has(id)) return;
     console.log(`[Offline Mesh] DataChannel open with ${id}`);
     offlineDataChannels.set(id, dc);
-    useNetworkStore.getState().setPeerCount(useNetworkStore.getState().peerCount + 1);
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
 
     // Request sync
     try {
@@ -174,7 +182,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
   dc.onclose = () => {
     console.log(`[Offline Mesh] DataChannel closed with ${id}`);
     offlineDataChannels.delete(id);
-    useNetworkStore.getState().setPeerCount(Math.max(0, useNetworkStore.getState().peerCount - 1));
+    useNetworkStore.getState().setPeerCount(getOnlinePeerCount() + offlineDataChannels.size);
   };
 }
 

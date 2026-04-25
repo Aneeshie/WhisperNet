@@ -6,7 +6,7 @@ import { Scanner } from "@/components/Scanner";
 
 export default function QRRead() {
   const [scannedPayload, setScannedPayload] = useState<string | null>(null);
-  const { fetchMessages } = useMessageStore();
+  const fetchMessages = useMessageStore(state => state.fetchMessages);
 
   const handleScan = async (text: string) => {
     setScannedPayload(text);

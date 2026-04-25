@@ -13,6 +13,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
 
   const handleStartHost = async () => {
+    setError("");
     setMode("HOST");
     setStep(1);
     setLoading(true);
@@ -28,11 +29,13 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   };
 
   const handleStartJoin = () => {
+    setError("");
     setMode("JOIN");
     setStep(1);
   };
 
   const handleJoinScan = async (scanned: string) => {
+    setError("");
     setLoading(true);
     try {
       const answerStr = await processJoinerOfferAndGenerateAnswer(scanned);
@@ -46,6 +49,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   };
 
   const handleHostScan = async (scanned: string) => {
+    setError("");
     setLoading(true);
     try {
       await finalizeHostConnection(scanned, offerId);

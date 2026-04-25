@@ -52,17 +52,20 @@ export const useMessageStore = create<MessageState>((set) => ({
   addMessage: async (msg) => {
     try {
       await createMessage(msg);
+      
+      set((state) => ({ messages: [...state.messages, msg] }));
       toast.success("Message persisted to local mesh DB");
 
-      // Broadcast to WebRTC peers
-      await broadcastMessage(msg);
-
-      // Re-fetch to ensure store and DB are perfectly in sync
-      const dbMessages = await getMessages();
-      set({ messages: dbMessages });
+      try {
+        await broadcastMessage(msg);
+      } catch (broadcastErr) {
+        console.error("Failed to broadcast message:", broadcastErr);
+        toast.error("Message saved, but failed to broadcast to peers");
+      }
     } catch (error) {
       console.error("Failed to save message to DB:", error);
       toast.error("Database Error: Failed to save message");
+      throw error;
     }
   },
 }));
