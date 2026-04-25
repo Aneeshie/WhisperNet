@@ -4,12 +4,25 @@ import { useMessageStore } from "@/store";
 import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType, Priority } from "@/types/message";
 
+const MESSAGE_TYPES: { value: MessageType; label: string; emoji: string }[] = [
+  { value: "alert", label: "Alert", emoji: "🚨" },
+  { value: "route", label: "Route", emoji: "🗺️" },
+  { value: "news", label: "News", emoji: "📰" },
+  { value: "resource", label: "Resource", emoji: "📦" },
+];
+
+const TTL_OPTIONS = [
+  { hours: 1, label: "1 hour" },
+  { hours: 12, label: "12 hours" },
+  { hours: 24, label: "1 day" },
+];
+
 export default function Alert() {
   const navigate = useNavigate();
   const { addMessage } = useMessageStore();
-  
+
   const [content, setContent] = useState("");
-  const [type, setType] = useState<MessageType>("alert");
+  const [type, setType] = useState<MessageType>("news");
   const [ttlHours, setTtlHours] = useState(12);
 
   const getPriorityForType = (t: MessageType): Priority => {
@@ -41,83 +54,82 @@ export default function Alert() {
     };
 
     await addMessage(newMessage);
-    setContent(""); // Clear form on success
-    navigate("/"); // Redirect to feed to see it immediately
+    setContent("");
+    navigate("/");
   };
 
   return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      <header className="py-4 border-b border-zinc-900">
-        <h1 className="text-xl font-bold tracking-tight text-red-500">Create Alert</h1>
-        <p className="text-xs font-mono text-zinc-500 mt-1">BROADCAST_MODE: ACTIVE</p>
+    <div className="flex flex-col h-full animate-fade-in-up">
+      <header className="px-5 pt-6 pb-4">
+        <h1 className="text-2xl font-bold tracking-tight">New Message</h1>
+        <p className="text-xs text-zinc-500 mt-1">Share something with your mesh network</p>
       </header>
-      
-      <div className="flex-1 flex flex-col space-y-4 mt-4 pb-8">
-        
+
+      <div className="flex-1 flex flex-col px-5 space-y-5 pb-8">
+
         {/* Type Selector */}
-        <div className="space-y-2">
-          <label className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Type</label>
-          <div className="grid grid-cols-2 gap-2">
-            {(['alert', 'route', 'news', 'resource'] as MessageType[]).map((t) => (
+        <div className="space-y-2.5">
+          <label className="text-sm font-medium text-zinc-400">Type</label>
+          <div className="grid grid-cols-4 gap-2">
+            {MESSAGE_TYPES.map((t) => (
               <button
-                key={t}
-                onClick={() => setType(t)}
-                className={`py-2 px-3 rounded text-xs font-mono tracking-wider uppercase border transition-colors ${
-                  type === t 
-                    ? t === 'alert' ? 'border-red-900 bg-red-950/30 text-red-400' : 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                    : 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
+                key={t.value}
+                onClick={() => setType(t.value)}
+                className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border transition-all duration-200 ${
+                  type === t.value
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-300 shadow-sm"
+                    : "border-white/5 bg-white/3 text-zinc-500 hover:bg-white/5"
                 }`}
               >
-                {t}
+                <span className="text-lg">{t.emoji}</span>
+                <span className="text-[11px] font-medium">{t.label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* TTL Selector */}
-        <div className="space-y-2">
-          <label className="text-xs font-mono text-zinc-500 uppercase tracking-widest">Time To Live (TTL)</label>
-          <div className="flex space-x-2">
-            {[1, 12, 24].map((hours) => (
+        <div className="space-y-2.5">
+          <label className="text-sm font-medium text-zinc-400">Expires in</label>
+          <div className="flex gap-2">
+            {TTL_OPTIONS.map(({ hours, label }) => (
               <button
                 key={hours}
                 onClick={() => setTtlHours(hours)}
-                className={`flex-1 py-2 rounded text-xs font-mono border transition-colors ${
+                className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${
                   ttlHours === hours
-                    ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                    : 'border-zinc-800 bg-zinc-900/50 text-zinc-500'
+                    ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
+                    : "border-white/5 bg-white/3 text-zinc-500 hover:bg-white/5"
                 }`}
               >
-                {hours}H
+                {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Message Payload */}
-        <div className="bg-zinc-900/50 p-4 rounded-md border border-zinc-800 mt-2">
-          <p className="text-sm font-mono text-zinc-400 mb-2">MESSAGE_PAYLOAD</p>
-          <textarea 
+        {/* Message Input */}
+        <div className="space-y-2.5 flex-1 flex flex-col">
+          <label className="text-sm font-medium text-zinc-400">What's happening?</label>
+          <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full h-32 bg-black border border-zinc-800 rounded p-2 text-sm text-zinc-300 focus:outline-none focus:border-red-500/50 resize-none font-mono placeholder:text-zinc-700"
-            placeholder="Enter message details..."
+            className="flex-1 min-h-[120px] glass-card p-4 text-sm text-zinc-200 focus:outline-none focus:border-blue-500/20 resize-none placeholder:text-zinc-600 transition-colors"
+            placeholder="Type your message here..."
           />
         </div>
-        
-        {/* Submit Button */}
-        <button 
+
+        {/* Submit */}
+        <button
           onClick={handleSubmit}
           disabled={!content.trim()}
-          className={`w-full py-3 mt-4 border rounded flex items-center justify-center space-x-2 transition-colors ${
-            !content.trim() 
-              ? 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'
-              : type === 'alert'
-                ? 'bg-red-950/30 text-red-500 border-red-900/50 active:bg-red-900/50'
-                : 'bg-zinc-800 text-zinc-100 border-zinc-600 active:bg-zinc-700'
+          className={`w-full py-3.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+            !content.trim()
+              ? "bg-white/5 text-zinc-600 cursor-not-allowed"
+              : "bg-blue-500/20 hover:bg-blue-500/25 text-blue-300 active:scale-[0.98]"
           }`}
         >
-          <span className="font-mono text-sm tracking-widest font-bold">BROADCAST</span>
+          Send Message
         </button>
       </div>
     </div>

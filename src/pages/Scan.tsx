@@ -4,37 +4,37 @@ import QRRead from "./QRRead";
 
 export default function Scan() {
   return (
-    <div className="flex flex-col h-full p-4 space-y-4">
-      <header className="py-4 border-b border-zinc-900">
-        <h1 className="text-xl font-bold tracking-tight">QR Drop & Scan</h1>
-        <p className="text-xs font-mono text-zinc-500 mt-1">OPTICAL_LINK: READY</p>
+    <div className="flex flex-col h-full animate-fade-in-up">
+      <header className="px-5 pt-6 pb-4">
+        <h1 className="text-2xl font-bold tracking-tight">Share Messages</h1>
+        <p className="text-xs text-zinc-500 mt-1">Send or receive messages via QR code</p>
       </header>
-      
+
       {/* Tab Navigation */}
-      <div className="flex p-1 bg-zinc-900/50 border border-zinc-800 rounded">
+      <div className="mx-5 flex p-1 bg-white/3 border border-white/5 rounded-xl">
         <NavLink
           to="/scan/read"
           className={({ isActive }) =>
-            `flex-1 py-2 text-center text-xs font-mono tracking-wider uppercase rounded transition-colors ${
-              isActive ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+            `flex-1 py-2.5 text-center text-sm font-medium rounded-lg transition-all duration-200 ${
+              isActive ? "bg-white/8 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
             }`
           }
         >
-          SCAN
+          Receive
         </NavLink>
         <NavLink
           to="/scan/gen"
           className={({ isActive }) =>
-            `flex-1 py-2 text-center text-xs font-mono tracking-wider uppercase rounded transition-colors ${
-              isActive ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"
+            `flex-1 py-2.5 text-center text-sm font-medium rounded-lg transition-all duration-200 ${
+              isActive ? "bg-white/8 text-zinc-100 shadow-sm" : "text-zinc-500 hover:text-zinc-300"
             }`
           }
         >
-          GENERATE
+          Send
         </NavLink>
       </div>
 
-      <div className="flex-1 flex flex-col pt-4">
+      <div className="flex-1 flex flex-col px-5 pt-4">
         <Routes>
           <Route path="/" element={<Navigate to="read" replace />} />
           <Route path="read" element={<QRRead />} />
