@@ -133,7 +133,7 @@ export function connectToPeer(targetId: string, silent = false) {
 }
 
 function setupConnection(conn: DataConnection) {
-  conn.on("open", () => {
+  conn.on("open", async () => {
     pendingConnections.delete(conn.peer);
     toast.success(`Connected to Peer!`, { id: `dial-${conn.peer}` });
     console.log(`[Mesh] DataChannel open with ${conn.peer}`);
@@ -145,6 +145,18 @@ function setupConnection(conn: DataConnection) {
 
     // Request sync from this new peer
     conn.send(JSON.stringify({ type: "sync_req" }));
+
+    // --- SILENT OFFLINE TUNNEL BOOTSTRAPPING ---
+    const myId = useUIStore.getState().myPeerId;
+    if (myId && myId > conn.peer) {
+      try {
+        console.log(`[Offline Mesh] Bootstrapping silent host tunnel for ${conn.peer}...`);
+        const result = await generateHostOffer();
+        conn.send(JSON.stringify({ type: "silent_offer", offer: result.offer, offerId: result.offerId }));
+      } catch (e) {
+        console.error("[Offline Mesh] Failed to bootstrap silent tunnel", e);
+      }
+    }
   });
 
   conn.on("data", async (data: unknown) => {
@@ -160,6 +172,13 @@ function setupConnection(conn: DataConnection) {
         }
       } else if ((parsed as any).type === "broadcast") {
         await processIncomingMessage((parsed as any).message, true);
+      } else if ((parsed as any).type === "silent_offer") {
+        console.log(`[Offline Mesh] Received silent offer from ${conn.peer}, generating answer...`);
+        const answer = await processJoinerOfferAndGenerateAnswer((parsed as any).offer);
+        conn.send(JSON.stringify({ type: "silent_answer", answer, offerId: (parsed as any).offerId }));
+      } else if ((parsed as any).type === "silent_answer") {
+        console.log(`[Offline Mesh] Received silent answer from ${conn.peer}, finalizing tunnel...`);
+        await finalizeHostConnection((parsed as any).answer, (parsed as any).offerId);
       }
     } catch (e) {
       console.error("[Mesh] Failed to process incoming data", e);
@@ -179,7 +198,12 @@ function setupConnection(conn: DataConnection) {
   });
 }
 
-import { broadcastOfflineMessage } from "./offlineMesh";
+import {
+  broadcastOfflineMessage,
+  generateHostOffer,
+  processJoinerOfferAndGenerateAnswer,
+  finalizeHostConnection
+} from "./offlineMesh";
 
 // In-memory cache for instant synchronous deduplication to prevent async race conditions
 const seenMessageIds = new Set<string>();
