@@ -1,5 +1,5 @@
 import { strToU8, compressSync, decompressSync, strFromU8 } from "fflate";
-import { getMessages, createMessage } from "@/db/messages";
+import { getMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useUIStore } from "@/store";
 import { processIncomingMessage } from "./mesh";
@@ -70,7 +70,7 @@ export async function generateHostOffer(): Promise<string> {
 // Step 2: Joiner scans Offer and generates Answer
 export async function processJoinerOfferAndGenerateAnswer(compressedOffer: string): Promise<string> {
   const offerDesc = JSON.parse(decompressSDP(compressedOffer));
-  
+
   const pc = new RTCPeerConnection({ iceServers: [] });
   activeOfflinePCs.push(pc);
 
@@ -105,7 +105,7 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
 // Step 3: Host scans Answer
 export async function finalizeHostConnection(compressedAnswer: string): Promise<void> {
   if (!pendingPc) throw new Error("No pending host connection");
-  
+
   const answerDesc = JSON.parse(decompressSDP(compressedAnswer));
   await pendingPc.setRemoteDescription(new RTCSessionDescription(answerDesc));
 
@@ -123,7 +123,7 @@ const activeOfflinePCs: RTCPeerConnection[] = [];
 
 function setupOfflineDataChannel(dc: RTCDataChannel) {
   const id = Math.random().toString(36).substring(2, 9);
-  
+
   const handleOpen = () => {
     if (offlineDataChannels.has(id)) return;
     console.log(`[Offline Mesh] DataChannel open with ${id}`);

@@ -6,7 +6,7 @@ import Feed from "@/pages/Feed";
 import Alert from "@/pages/Alert";
 import Scan from "@/pages/Scan";
 import Settings from "@/pages/Settings";
-import { initMesh, leaveMesh } from "@/sync/mesh";
+import { initMesh } from "@/sync/mesh";
 
 export default function App() {
   useEffect(() => {

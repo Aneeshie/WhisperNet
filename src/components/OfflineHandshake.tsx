@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import QRCode from "qrcode";
 import { Scanner } from "./Scanner";
 import { generateHostOffer, processJoinerOfferAndGenerateAnswer, finalizeHostConnection } from "@/sync/offlineMesh";
-import { X, Smartphone, WifiOff } from "lucide-react";
+import { X, WifiOff } from "lucide-react";
 
 export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"SELECT" | "HOST" | "JOIN">("SELECT");
@@ -14,11 +14,11 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (qrData) {
-      QRCode.toDataURL(qrData, { 
-        width: 800, 
-        margin: 2, 
-        errorCorrectionLevel: "L", 
-        color: { dark: "#ffffff", light: "#000000" } 
+      QRCode.toDataURL(qrData, {
+        width: 800,
+        margin: 2,
+        errorCorrectionLevel: "L",
+        color: { dark: "#ffffff", light: "#000000" }
       })
         .then(setQrSrc)
         .catch(console.error);
@@ -72,7 +72,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 backdrop-blur-md">
       <div className="bg-zinc-950 border border-zinc-800 rounded-xl w-full max-w-md flex flex-col relative overflow-hidden shadow-2xl">
-        
+
         <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-zinc-900/20">
           <div className="flex items-center space-x-2">
             <WifiOff className="w-5 h-5 text-zinc-400" />
@@ -93,18 +93,18 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
           {mode === "SELECT" && (
             <div className="flex flex-col items-center justify-center space-y-6 w-full flex-1">
               <p className="text-center text-xs text-zinc-400 font-mono px-4 leading-relaxed">
-                Connect two devices instantly over local Wi-Fi without internet. 
+                Connect two devices instantly over local Wi-Fi without internet.
                 One device must Host, the other must Join.
               </p>
-              
+
               <div className="flex flex-col w-full space-y-3 mt-4">
-                <button 
+                <button
                   onClick={handleStartHost}
                   className="bg-blue-900/80 hover:bg-blue-800 text-blue-100 py-4 rounded-lg font-mono text-sm tracking-widest font-bold transition-all border border-blue-800"
                 >
                   CREATE HOST
                 </button>
-                <button 
+                <button
                   onClick={handleStartJoin}
                   className="bg-zinc-900 hover:bg-zinc-800 text-zinc-300 py-4 rounded-lg font-mono text-sm tracking-widest font-bold transition-all border border-zinc-700"
                 >
@@ -133,7 +133,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
                   <p className="text-xs text-center text-zinc-400 font-mono mt-4">
                     Have the other device scan this QR code to initiate the handshake.
                   </p>
-                  <button 
+                  <button
                     onClick={() => setStep(2)}
                     disabled={!qrSrc}
                     className="w-full bg-blue-900/80 hover:bg-blue-800 text-blue-100 py-3 rounded-lg font-mono text-xs tracking-widest font-bold disabled:opacity-50 mt-4"
