@@ -22,6 +22,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
       setQrData(result.offer);
       setOfferId(result.offerId);
     } catch (e) {
+      console.error(e);
       setError("Failed to create connection code. Make sure Wi-Fi is enabled.");
     } finally {
       setLoading(false);
@@ -42,6 +43,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
       setQrData(answerStr);
       setStep(2);
     } catch (e) {
+      console.error(e);
       setError("Couldn't read that QR code. Ask your friend to try again.");
     } finally {
       setLoading(false);
@@ -58,6 +60,7 @@ export function OfflineHandshake({ onClose }: { onClose: () => void }) {
         onClose();
       }, 4000);
     } catch (e) {
+      console.error(e);
       setError("Couldn't read that QR code. Ask your friend to try again.");
     } finally {
       setLoading(false);

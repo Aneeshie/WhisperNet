@@ -167,7 +167,10 @@ function setupConnection(conn: DataConnection) {
     try {
       const parsed = typeof data === "string" ? JSON.parse(data as string) : data;
 
-      if ((parsed as any).type === "sync_req") {
+      if (!parsed || typeof parsed !== "object") return;
+      const dataObj = parsed as Record<string, unknown>;
+
+      if (dataObj.type === "sync_req") {
         const myMessages = await getMessages();
         const BATCH_SIZE = 5;
         for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
@@ -179,19 +182,19 @@ function setupConnection(conn: DataConnection) {
           }
           await new Promise(r => setTimeout(r, 50));
         }
-      } else if ((parsed as any).type === "sync_res") {
-        for (const msg of (parsed as any).messages) {
+      } else if (dataObj.type === "sync_res") {
+        for (const msg of dataObj.messages as Message[]) {
           await processIncomingMessage(msg, false); // DO NOT RELAY historical sync
         }
-      } else if ((parsed as any).type === "broadcast") {
-        await processIncomingMessage((parsed as any).message, true);
-      } else if ((parsed as any).type === "silent_offer") {
+      } else if (dataObj.type === "broadcast") {
+        await processIncomingMessage(dataObj.message as Message, true);
+      } else if (dataObj.type === "silent_offer") {
         console.log(`[Offline Mesh] Received silent offer from ${conn.peer}, generating answer...`);
-        const answer = await processJoinerOfferAndGenerateAnswer((parsed as any).offer);
-        conn.send(JSON.stringify({ type: "silent_answer", answer, offerId: (parsed as any).offerId }));
-      } else if ((parsed as any).type === "silent_answer") {
+        const answer = await processJoinerOfferAndGenerateAnswer(dataObj.offer as string);
+        conn.send(JSON.stringify({ type: "silent_answer", answer, offerId: dataObj.offerId }));
+      } else if (dataObj.type === "silent_answer") {
         console.log(`[Offline Mesh] Received silent answer from ${conn.peer}, finalizing tunnel...`);
-        await finalizeHostConnection((parsed as any).answer, (parsed as any).offerId);
+        await finalizeHostConnection(dataObj.answer as string, dataObj.offerId as string);
       }
     } catch (e) {
       console.error("[Mesh] Failed to process incoming data", e);

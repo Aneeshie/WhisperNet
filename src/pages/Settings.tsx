@@ -23,7 +23,6 @@ export default function Settings() {
   const { isNavigating, setNavigating } = useUIStore();
   const { fetchMessages } = useMessageStore();
   const { myPeerId } = useNetworkStore();
-  const now = Date.now();
 
   // Stealth Dev Mode State
   const [devModeEnabled, setDevModeEnabled] = useState(false);
@@ -52,6 +51,7 @@ export default function Settings() {
 
   const handleGenerateMessages = async () => {
     try {
+      const now = Date.now();
       const types: MessageType[] = ["alert", "news", "route", "resource"];
       for (let i = 0; i < 50; i++) {
         const type = types[Math.floor(Math.random() * types.length)];
@@ -80,6 +80,7 @@ export default function Settings() {
 
   const handleGenerateShortTTLMessage = async () => {
     try {
+      const now = Date.now();
       const msg: Message = {
         id: `msg_${uuidv4().substring(0, 8)}`,
         type: "news",
