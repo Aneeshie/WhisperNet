@@ -2,7 +2,7 @@ import { getMessages } from "../db/messages";
 import type { QRBundle } from "./schema";
 import LZString from "lz-string";
 import { useSecurityStore } from "@/store";
-import { hmacSign, encrypt, decrypt } from "@/privacy/crypto";
+import { decrypt } from "@/privacy/crypto";
 
 export async function exportBundle(limit?: number): Promise<string> {
   const messages = await getMessages();
@@ -35,20 +35,6 @@ export async function exportBundle(limit?: number): Promise<string> {
     messages: decryptedMessages,
   };
 
-  // Sign the bundle with HMAC for integrity verification
-  if (encKey) {
-    const dataToSign = JSON.stringify(bundle.messages);
-    bundle.hmac = await hmacSign(encKey, dataToSign);
-  }
-
   const rawString = JSON.stringify(bundle);
-
-  // Optionally encrypt the entire bundle payload
-  if (encKey) {
-    const encrypted = await encrypt(encKey, rawString);
-    // Prefix with "ENC:" so the importer knows it's encrypted
-    return LZString.compressToBase64("ENC:" + encrypted);
-  }
-
   return LZString.compressToBase64(rawString);
 }

@@ -17,7 +17,7 @@ export default function QRRead() {
       toast.success(`Received ${count} messages`);
     } catch (error) {
       console.error("Import Error", error);
-      toast.error("Invalid or corrupted QR code");
+      toast.error(error instanceof Error ? error.message : "Invalid or corrupted QR code");
     }
   };
 

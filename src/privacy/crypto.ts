@@ -151,16 +151,23 @@ export async function encrypt(key: CryptoKey, plaintext: string): Promise<string
     encoder.encode(plaintext)
   );
 
-  // Pack as: base64(iv + ciphertext)
   const combined = new Uint8Array(iv.length + new Uint8Array(ciphertext).length);
   combined.set(iv);
   combined.set(new Uint8Array(ciphertext), iv.length);
 
-  return btoa(String.fromCharCode(...combined));
+  let binary = "";
+  for (let i = 0; i < combined.length; i++) {
+    binary += String.fromCharCode(combined[i]);
+  }
+  return btoa(binary);
 }
 
 export async function decrypt(key: CryptoKey, encryptedBase64: string): Promise<string> {
-  const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+  const binary = atob(encryptedBase64);
+  const combined = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    combined[i] = binary.charCodeAt(i);
+  }
 
   const iv = combined.slice(0, 12);
   const ciphertext = combined.slice(12);
@@ -185,46 +192,6 @@ export function getSignablePayload(msg: { id: string; content: string; createdAt
   return `${msg.id}:${msg.content}:${msg.createdAt}`;
 }
 
-// ─── HMAC-SHA256 (QR Bundle Integrity) ───────────────────────────
-
-/**
- * Derives a dedicated HMAC key from the same PIN salt.
- * We can't export the AES-GCM key (non-extractable), so we derive
- * a separate key using PBKDF2 with a "hmac-" prefixed salt.
- */
-async function deriveHmacKey(): Promise<CryptoKey | null> {
-  const salt = localStorage.getItem("whispernet_pin_salt");
-  if (!salt) return null;
-
-  // Use the stored PIN hash as key material (we can't access the raw PIN)
-  const pinHash = localStorage.getItem("whispernet_pin_hash");
-  if (!pinHash) return null;
-
-  const encoder = new TextEncoder();
-  const saltBytes = Uint8Array.from(atob(salt), c => c.charCodeAt(0));
-  // Create a unique salt for HMAC by appending a domain separator
-  const hmacSalt = new Uint8Array(saltBytes.length + 5);
-  hmacSalt.set(saltBytes);
-  hmacSalt.set(encoder.encode("hmac:"), saltBytes.length);
-
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    Uint8Array.from(atob(pinHash), c => c.charCodeAt(0)),
-    "PBKDF2",
-    false,
-    ["deriveKey"]
-  );
-
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: hmacSalt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-    keyMaterial,
-    { name: "HMAC", hash: "SHA-256", length: 256 },
-    false,
-    ["sign", "verify"]
-  );
-}
-
-export async function hmacSign(_key: CryptoKey, data: string): Promise<string> {
   const hmacKey = await deriveHmacKey();
   if (!hmacKey) throw new Error("Cannot derive HMAC key");
 
