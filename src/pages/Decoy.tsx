@@ -6,7 +6,7 @@ export default function Decoy() {
   const { unlock } = useSecurityStore();
   const [searchValue, setSearchValue] = useState("");
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (searchValue.trim() === "") return;
     
