@@ -210,15 +210,6 @@ graph LR
     F -->|Invalid| H["Unverified - amber badge"]
 ```
 
-### What is NOT Protected (Be Aware)
-
-| Risk | Details |
-|---|---|
-| **PeerJS signaling server** | The initial handshake for Global P2P goes through PeerJS cloud. PeerJS can see that two Peer IDs are connecting (metadata), but **cannot read messages** (those go over encrypted WebRTC). |
-| **Relay node visibility** | Messages that hop through intermediate nodes are readable by the relay. For broadcast messages (alerts, news), this is by design -- they need to be readable to be useful. |
-| **QR codes are unencrypted** | When you show a QR code, anyone who scans it can read the messages. Only show QR codes to people you trust. |
-| **Private key in localStorage** | The ECDSA private key is stored in localStorage as a JWK. It is protected by the browser sandbox but not encrypted at rest. |
-
 ### Security Model
 
 ```
