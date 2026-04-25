@@ -17,7 +17,6 @@ export default function QRGen() {
   const [sendLimit, setSendLimit] = useState<number>(5);
   const [staticQrUrl, setStaticQrUrl] = useState<string>("");
   const [tooLarge, setTooLarge] = useState(false);
-  const [msgCount, setMsgCount] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Regenerate payload when limit changes
@@ -29,8 +28,6 @@ export default function QRGen() {
         const payload = await exportBundle(sendLimit || undefined);
         if (isMounted) {
           setPayloadString(payload);
-          // Estimate message count from the limit
-          setMsgCount(sendLimit || -1); // -1 = all
         }
       } catch (error) {
         console.error("Payload Export Error", error);
