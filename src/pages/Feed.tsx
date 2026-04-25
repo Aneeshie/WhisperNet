@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { useUIStore } from "@/store";
+import { useNetworkStore, useMessageStore } from "@/store";
 import { Clock, Navigation, AlertTriangle, Info } from "lucide-react";
 import type { Message } from "@/types/message";
 import { connectToPeer } from "@/sync/mesh";
 import { OfflineHandshake } from "@/components/OfflineHandshake";
 
 export default function Feed() {
-  const { messages, fetchMessages, peerCount, myPeerId } = useUIStore();
+  const { messages, fetchMessages } = useMessageStore();
+  const { peerCount, myPeerId } = useNetworkStore();
 
   const [now, setNow] = useState(() => Date.now());
   const [connectId, setConnectId] = useState("");

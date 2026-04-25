@@ -1,7 +1,7 @@
 import { strToU8, compressSync, decompressSync, strFromU8 } from "fflate";
 import { getMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
-import { useUIStore } from "@/store";
+import { useNetworkStore } from "@/store";
 import { processIncomingMessage } from "./mesh";
 
 export const offlineDataChannels = new Map<string, RTCDataChannel>();
@@ -138,7 +138,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
     if (offlineDataChannels.has(id)) return;
     console.log(`[Offline Mesh] DataChannel open with ${id}`);
     offlineDataChannels.set(id, dc);
-    useUIStore.getState().setPeerCount(useUIStore.getState().peerCount + 1);
+    useNetworkStore.getState().setPeerCount(useNetworkStore.getState().peerCount + 1);
 
     // Request sync
     try {
@@ -187,7 +187,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
   dc.onclose = () => {
     console.log(`[Offline Mesh] DataChannel closed with ${id}`);
     offlineDataChannels.delete(id);
-    useUIStore.getState().setPeerCount(Math.max(0, useUIStore.getState().peerCount - 1));
+    useNetworkStore.getState().setPeerCount(Math.max(0, useNetworkStore.getState().peerCount - 1));
   };
 }
 

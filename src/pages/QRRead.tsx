@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { importBundle } from "@/qr/importBundle";
-import { useUIStore } from "@/store";
+import { useMessageStore } from "@/store";
 import { Scanner } from "@/components/Scanner";
 
 export default function QRRead() {
   const [scannedPayload, setScannedPayload] = useState<string | null>(null);
-  const { fetchMessages } = useUIStore();
+  const { fetchMessages } = useMessageStore();
 
   const handleScan = async (text: string) => {
     setScannedPayload(text);

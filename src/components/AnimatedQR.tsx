@@ -16,7 +16,7 @@ export function AnimatedQR({ payload }: AnimatedQRProps) {
     async function generate() {
       if (!payload) return;
       
-      const chunks = splitPayload(payload, 100); // Drastically reduced density
+      const chunks = splitPayload(payload, 50); // Drastically reduced density
       
       try {
         const urls = await Promise.all(
@@ -28,7 +28,7 @@ export function AnimatedQR({ payload }: AnimatedQRProps) {
                   width: 800, 
                   margin: 2, 
                   color: { dark: "#ffffff", light: "#000000" }, 
-                  errorCorrectionLevel: "L" 
+                  errorCorrectionLevel: "M" 
                 },
                 (err, url) => {
                   if (err) reject(err);

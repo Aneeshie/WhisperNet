@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useUIStore } from "@/store";
+import { useUIStore, useMessageStore } from "@/store";
 import { toast } from "sonner";
 import { db } from "@/db/db";
 import { createMessage, deleteExpiredMessages } from "@/db/messages";
@@ -7,7 +7,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { Message, MessageType } from "@/types/message";
 
 export default function Settings() {
-  const { isNavigating, setNavigating, fetchMessages } = useUIStore();
+  const { isNavigating, setNavigating } = useUIStore();
+  const { fetchMessages } = useMessageStore();
   
   // Stealth Dev Mode State
   const [devModeEnabled, setDevModeEnabled] = useState(false);

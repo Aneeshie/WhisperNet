@@ -7,9 +7,14 @@ import { broadcastMessage } from "@/sync/mesh";
 interface UIState {
   isNavigating: boolean;
   setNavigating: (state: boolean) => void;
-  messages: Message[];
-  fetchMessages: () => Promise<void>;
-  addMessage: (msg: Message) => Promise<void>;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  isNavigating: false,
+  setNavigating: (state) => set({ isNavigating: state }),
+}));
+
+interface NetworkState {
   peerCount: number;
   myPeerId: string | null;
   setPeerCount: (count: number) => void;
@@ -18,16 +23,23 @@ interface UIState {
   removePeer: () => void;
 }
 
-export const useUIStore = create<UIState>((set, get) => ({
-  isNavigating: false,
-  setNavigating: (state) => set({ isNavigating: state }),
-  messages: [],
+export const useNetworkStore = create<NetworkState>((set, get) => ({
   peerCount: 0,
   myPeerId: null,
   setPeerCount: (count) => set({ peerCount: count }),
   setMyPeerId: (id) => set({ myPeerId: id }),
   addPeer: () => set({ peerCount: get().peerCount + 1 }),
   removePeer: () => set({ peerCount: Math.max(0, get().peerCount - 1) }),
+}));
+
+interface MessageState {
+  messages: Message[];
+  fetchMessages: () => Promise<void>;
+  addMessage: (msg: Message) => Promise<void>;
+}
+
+export const useMessageStore = create<MessageState>((set) => ({
+  messages: [],
   fetchMessages: async () => {
     try {
       const dbMessages = await getMessages();

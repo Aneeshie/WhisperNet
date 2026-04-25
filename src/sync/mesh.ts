@@ -1,7 +1,7 @@
 import Peer, { type DataConnection } from "peerjs";
 import { getMessages, createMessage } from "@/db/messages";
 import type { Message } from "@/types/message";
-import { useUIStore } from "@/store";
+import { useNetworkStore, useMessageStore } from "@/store";
 
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
@@ -21,7 +21,7 @@ export function initMesh() {
 
   peer.on("open", (id) => {
     console.log(`[Mesh] Connected to global signaling server. My ID: ${id}`);
-    useUIStore.getState().setMyPeerId(id);
+    useNetworkStore.getState().setMyPeerId(id);
   });
 
   peer.on("connection", (conn) => {
@@ -64,7 +64,7 @@ function setupConnection(conn: DataConnection) {
   conn.on("open", () => {
     console.log(`[Mesh] DataChannel open with ${conn.peer}`);
     connections.set(conn.peer, conn);
-    useUIStore.getState().setPeerCount(connections.size);
+    useNetworkStore.getState().setPeerCount(connections.size);
 
     // Request sync from this new peer
     conn.send(JSON.stringify({ type: "sync_req" }));
@@ -97,7 +97,7 @@ function setupConnection(conn: DataConnection) {
   conn.on("close", () => {
     console.log(`[Mesh] DataChannel closed with ${conn.peer}`);
     connections.delete(conn.peer);
-    useUIStore.getState().setPeerCount(connections.size);
+    useNetworkStore.getState().setPeerCount(connections.size);
   });
 
   conn.on("error", (err) => {
@@ -137,7 +137,7 @@ export async function processIncomingMessage(msg: Message, shouldRelay: boolean 
 
   // 3. Save and update UI
   await createMessage(msg);
-  useUIStore.setState({ messages: await getMessages() });
+  useMessageStore.setState({ messages: await getMessages() });
   
   // 4. Relay the message (Flooding algorithm)
   if (shouldRelay) {
@@ -151,6 +151,6 @@ export function leaveMesh() {
     peer = null;
   }
   connections.clear();
-  useUIStore.getState().setPeerCount(0);
-  useUIStore.getState().setMyPeerId("");
+  useNetworkStore.getState().setPeerCount(0);
+  useNetworkStore.getState().setMyPeerId("");
 }
