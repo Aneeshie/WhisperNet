@@ -45,6 +45,13 @@ export async function generateHostOffer(): Promise<{ offer: string, offerId: str
   const offerId = Math.random().toString(36).substring(2, 10);
   pendingConnections.set(offerId, { pc, dc });
 
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[Offline Mesh Host] ICE state: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "failed") {
+      toast.error("Offline Mesh: Connection failed. Devices might not be on the same Wi-Fi.");
+    }
+  };
+
   return new Promise((resolve, reject) => {
     pc.onicecandidate = (event) => {
       if (event.candidate === null) {
@@ -86,6 +93,13 @@ export async function processJoinerOfferAndGenerateAnswer(compressedOffer: strin
   pc.ondatachannel = (event) => {
     activeOfflineDCs.push(event.channel);
     setupOfflineDataChannel(event.channel);
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[Offline Mesh Joiner] ICE state: ${pc.iceConnectionState}`);
+    if (pc.iceConnectionState === "failed") {
+      toast.error("Offline Mesh: Connection failed. Devices might not be on the same Wi-Fi.");
+    }
   };
 
   return new Promise((resolve, reject) => {
