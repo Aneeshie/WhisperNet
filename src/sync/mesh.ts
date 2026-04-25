@@ -1,5 +1,5 @@
 import Peer, { type DataConnection } from "peerjs";
-import { getMessages, createMessage } from "@/db/messages";
+import { getMessages, createMessage, getDecryptedMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useNetworkStore, useMessageStore, useSecurityStore } from "@/store";
 import { verifySignature, getSignablePayload, encrypt } from "@/privacy/crypto";
@@ -172,7 +172,7 @@ function setupConnection(conn: DataConnection) {
       const dataObj = parsed as Record<string, unknown>;
 
       if (dataObj.type === "sync_req") {
-        const myMessages = await getMessages();
+        const myMessages = await getDecryptedMessages();
         const BATCH_SIZE = 5;
         for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
           const batch = myMessages.slice(i, i + BATCH_SIZE);

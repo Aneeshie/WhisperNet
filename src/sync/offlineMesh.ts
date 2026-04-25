@@ -1,5 +1,5 @@
 import { strToU8, compressSync, decompressSync, strFromU8 } from "fflate";
-import { getMessages } from "@/db/messages";
+import { getDecryptedMessages } from "@/db/messages";
 import type { Message } from "@/types/message";
 import { useNetworkStore } from "@/store";
 import { processIncomingMessage, getOnlinePeerCount } from "./mesh";
@@ -200,7 +200,7 @@ function setupOfflineDataChannel(dc: RTCDataChannel) {
       const parsed = JSON.parse(event.data);
 
       if (parsed.type === "sync_req") {
-        const myMessages = await getMessages();
+        const myMessages = await getDecryptedMessages();
         // Send messages in small batches to avoid WebRTC DataChannel message size limits
         const BATCH_SIZE = 5;
         for (let i = 0; i < myMessages.length; i += BATCH_SIZE) {
