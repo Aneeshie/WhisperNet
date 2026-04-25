@@ -115,9 +115,9 @@ export default function Settings() {
     }
   };
 
-  const handleSavePin = () => {
+  const handleSavePin = async () => {
     if (newPinValue.trim().length > 0) {
-      useSecurityStore.getState().setPin(newPinValue.trim());
+      await useSecurityStore.getState().setPin(newPinValue.trim());
       setShowPinInput(false);
       setNewPinValue("");
       toast.success("Unlock PIN updated successfully!");

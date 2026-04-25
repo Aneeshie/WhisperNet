@@ -6,12 +6,12 @@ export default function Decoy() {
   const { unlock } = useSecurityStore();
   const [searchValue, setSearchValue] = useState("");
 
-  const handleSearch = (e: React.SyntheticEvent) => {
+  const handleSearch = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (searchValue.trim() === "") return;
     
     // Check if it's the PIN
-    const isUnlocked = unlock(searchValue.trim());
+    const isUnlocked = await unlock(searchValue.trim());
     if (!isUnlocked) {
       // Fake action for real weather search feeling
       setSearchValue("");
