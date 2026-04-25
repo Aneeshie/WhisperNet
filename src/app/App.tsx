@@ -7,10 +7,18 @@ import Alert from "@/pages/Alert";
 import Scan from "@/pages/Scan";
 import Settings from "@/pages/Settings";
 import { initMesh } from "@/sync/mesh";
+import { runTTLPass } from "@/sync/ttl";
 
 export default function App() {
   useEffect(() => {
     initMesh();
+    
+    // Run TTL check every 10 seconds
+    const ttlInterval = setInterval(() => {
+      runTTLPass();
+    }, 10000);
+    
+    return () => clearInterval(ttlInterval);
   }, []);
 
   return (
