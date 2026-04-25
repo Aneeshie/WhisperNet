@@ -188,6 +188,67 @@ When a message arrives, WhisperNet checks its `id` against the local database. I
 
 ---
 
+## 🔐 Security & Privacy
+
+### What's Protected
+
+| Layer | Protection | Details |
+|---|---|---|
+| **WebRTC Data Channels** | ✅ **Encrypted by default** | All WebRTC DataChannels use DTLS (Datagram Transport Layer Security). This is built into the WebRTC spec — you can't turn it off even if you tried. Every message between peers is encrypted in transit. |
+| **Local Storage** | ✅ **Sandboxed** | Messages are stored in IndexedDB, which is sandboxed per-origin by the browser. No other website or app can read WhisperNet's data. |
+| **Stealth Mode** | ✅ **Plausible deniability** | The app looks like a weather app. Someone glancing at your phone sees weather data, not a mesh network. The PIN is entered via a fake "search for a city" bar. |
+| **TTL Auto-Delete** | ✅ **Forward security** | Messages auto-delete after their TTL expires (1h, 12h, or 24h). Even if someone gains access to your phone later, expired messages are already gone. |
+| **No Accounts** | ✅ **Anonymous** | No email, phone number, or login required. Your identity is a random 6-character Peer ID that changes every session. |
+
+### What's NOT Protected (Be Aware)
+
+| Risk | Details |
+|---|---|
+| **PeerJS signaling server** | The initial handshake for Global P2P goes through PeerJS's cloud server. PeerJS can see that two Peer IDs are connecting (metadata), but **cannot read the actual messages** (those go over encrypted WebRTC). |
+| **No end-to-end encryption at the app level** | While WebRTC encrypts data in transit between direct peers, messages that **hop** through intermediate nodes are decrypted and re-encrypted at each hop. A malicious relay node could read messages passing through it. |
+| **Message authenticity** | Messages don't have digital signatures. A relay node could theoretically modify a message before forwarding it. There's no way to verify that a message hasn't been tampered with. |
+| **PIN stored in plaintext** | The unlock PIN is stored in `localStorage` as plaintext. It's a UI-level lock, not a cryptographic one. If someone has developer tools access, they can read it. |
+| **QR codes are unencrypted** | When you show a QR code, anyone who scans it can read the messages. Only show QR codes to people you trust. |
+
+### Security Model Summary
+
+```
+┌─────────────────────────────────────────────────┐
+│              WhisperNet Security Model           │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│   SAFE from:                                     │
+│   ✓ Network eavesdroppers (DTLS encryption)      │
+│   ✓ Other apps reading your data (sandboxing)    │
+│   ✓ Casual phone inspection (stealth mode)       │
+│   ✓ Stale data exposure (TTL auto-delete)        │
+│   ✓ Identity tracking (no accounts, random IDs)  │
+│                                                  │
+│   NOT SAFE from:                                 │
+│   ✗ Malicious relay nodes (can read hop data)    │
+│   ✗ Physical device access (plaintext PIN)       │
+│   ✗ Targeted forensics (IndexedDB is readable)   │
+│   ✗ QR shoulder surfing (codes are unencrypted)  │
+│                                                  │
+│   BOTTOM LINE:                                   │
+│   Good enough for disaster relief, coordination, │
+│   and casual private messaging. Not designed for  │
+│   military-grade or journalist-level security.    │
+│   For that, you'd need E2E encryption + message   │
+│   signing (a future enhancement).                 │
+│                                                  │
+└─────────────────────────────────────────────────┘
+```
+
+### Future Security Enhancements (Roadmap)
+
+- **End-to-end encryption** — Encrypt messages with recipient's public key so relay nodes can't read them
+- **Message signing** — Attach a digital signature so recipients can verify the sender and detect tampering
+- **Encrypted local storage** — Encrypt IndexedDB with a key derived from the user's PIN
+- **PIN hashing** — Store a bcrypt/argon2 hash instead of the plaintext PIN
+
+---
+
 ## 🛠️ Tech Stack
 
 | Technology | Purpose |
