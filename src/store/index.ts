@@ -14,6 +14,24 @@ export const useUIStore = create<UIState>((set) => ({
   setNavigating: (state) => set({ isNavigating: state }),
 }));
 
+interface SecurityState {
+  isUnlocked: boolean;
+  unlock: (pin: string) => boolean;
+  lock: () => void;
+}
+
+export const useSecurityStore = create<SecurityState>((set) => ({
+  isUnlocked: false,
+  unlock: (pin: string) => {
+    if (pin === "1234") {
+      set({ isUnlocked: true });
+      return true;
+    }
+    return false;
+  },
+  lock: () => set({ isUnlocked: false }),
+}));
+
 interface NetworkState {
   peerCount: number;
   myPeerId: string | null;
