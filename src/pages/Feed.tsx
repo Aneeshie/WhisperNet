@@ -14,6 +14,7 @@ export default function Feed() {
   const [connectId, setConnectId] = useState("");
   const [showOfflineHandshake, setShowOfflineHandshake] = useState(false);
   const [offlinePeerCount, setOfflinePeerCount] = useState(0);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -66,6 +67,17 @@ export default function Feed() {
   };
 
   const sortedMessages = [...messages].sort((a, b) => b.createdAt - a.createdAt);
+  const filteredMessages = activeFilter
+    ? sortedMessages.filter((m) => m.type === activeFilter)
+    : sortedMessages;
+
+  const FILTERS = [
+    { value: null, label: "All", count: messages.length },
+    { value: "alert", label: "🚨 Alerts", count: messages.filter((m) => m.type === "alert").length },
+    { value: "news", label: "📰 News", count: messages.filter((m) => m.type === "news").length },
+    { value: "route", label: "🗺️ Routes", count: messages.filter((m) => m.type === "route").length },
+    { value: "resource", label: "📦 Resources", count: messages.filter((m) => m.type === "resource").length },
+  ];
 
   return (
     <div className="flex flex-col h-full animate-fade-in-up">
@@ -186,18 +198,45 @@ export default function Feed() {
         )}
       </header>
 
-      {/* Divider */}
+      {/* Category Filters */}
+      <div className="px-5 py-3 flex gap-2 overflow-x-auto no-scrollbar">
+        {FILTERS.map((f) => (
+          <button
+            key={f.label}
+            onClick={() => setActiveFilter(f.value)}
+            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
+              activeFilter === f.value
+                ? "bg-white/10 text-zinc-100 shadow-sm"
+                : "bg-white/3 text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {f.label}
+            {f.count > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                activeFilter === f.value ? "bg-white/10" : "bg-white/5"
+              }`}>
+                {f.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="h-px bg-white/5 mx-5" />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-        {sortedMessages.length === 0 ? (
+        {filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-center">
-            <p className="text-sm text-zinc-600">No messages yet</p>
-            <p className="text-xs text-zinc-700 mt-1">Messages from your mesh will appear here</p>
+            <p className="text-sm text-zinc-600">
+              {activeFilter ? `No ${activeFilter} messages` : "No messages yet"}
+            </p>
+            <p className="text-xs text-zinc-700 mt-1">
+              {activeFilter ? "Try a different filter" : "Messages from your mesh will appear here"}
+            </p>
           </div>
         ) : (
-          sortedMessages.map((msg: Message) => {
+          filteredMessages.map((msg: Message) => {
             const style = getMessageStyle(msg.type);
 
             return (
