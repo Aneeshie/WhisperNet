@@ -6,65 +6,142 @@ import { useNetworkStore, useMessageStore } from "@/store";
 let peer: Peer | null = null;
 const connections = new Map<string, DataConnection>();
 
-export function initMesh() {
-  if (peer) return;
+const knownPeers = new Set<string>(JSON.parse(localStorage.getItem("whispernet_peers") || "[]"));
 
-  // Initialize PeerJS with the free public cloud signaling server
-  peer = new Peer({
-    config: {
-      iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:global.stun.twilio.com:3478" }
-      ]
+function saveKnownPeers() {
+  localStorage.setItem("whispernet_peers", JSON.stringify(Array.from(knownPeers)));
+}
+
+const pendingConnections = new Set<string>();
+let reconnectInterval: ReturnType<typeof setInterval> | null = null;
+
+function startAutoReconnect() {
+  if (reconnectInterval) clearInterval(reconnectInterval);
+  reconnectInterval = setInterval(() => {
+    if (!peer || peer.disconnected) return;
+    
+    // Clean up knownPeers: remove any obviously invalid IDs
+    for (const targetId of knownPeers) {
+      if (targetId.length < 4) {
+        knownPeers.delete(targetId);
+        saveKnownPeers();
+      } else if (!connections.has(targetId) && !pendingConnections.has(targetId) && targetId !== peer.id) {
+        connectToPeer(targetId, true);
+      }
     }
-  });
+  }, 5000);
+}
 
-  peer.on("open", (id) => {
+function setupPeerEvents(p: Peer) {
+  p.on("open", (id) => {
     console.log(`[Mesh] Connected to global signaling server. My ID: ${id}`);
+    localStorage.setItem("whispernet_my_id", id);
     useNetworkStore.getState().setMyPeerId(id);
+    startAutoReconnect();
   });
 
-  peer.on("connection", (conn) => {
+  p.on("connection", (conn) => {
     console.log(`[Mesh] Incoming connection from ${conn.peer}`);
     setupConnection(conn);
   });
 
-  peer.on("disconnected", () => {
+  p.on("disconnected", () => {
     console.log("[Mesh] Disconnected from signaling server");
-    // Try to reconnect to signaling server
     if (peer && !peer.destroyed) {
       peer.reconnect();
     }
   });
 
-  peer.on("error", (err) => {
+  p.on("error", (err) => {
+    if (err.type === "peer-unavailable") return; // Suppress auto-reconnect logs
+    
+    if (err.type === "unavailable-id") {
+      console.warn("[Mesh] Saved ID is taken. Falling back to random ID.");
+      localStorage.removeItem("whispernet_my_id");
+      if (peer) {
+        peer.destroy();
+        peer = null;
+      }
+      initMesh(); // Retry without the saved ID
+      return;
+    }
+
     console.error("[Mesh] PeerJS Error:", err);
   });
 }
 
-export function connectToPeer(targetId: string) {
+function generateShortId() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let result = "";
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+export function initMesh() {
+  if (peer) return;
+
+  const savedId = localStorage.getItem("whispernet_my_id");
+  const config = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" }
+    ]
+  };
+
+  const idToUse = savedId || generateShortId();
+  peer = new Peer(idToUse, { config });
+
+  setupPeerEvents(peer);
+}
+
+import { toast } from "sonner";
+
+export function connectToPeer(targetId: string, silent = false) {
   if (!peer) {
-    console.error("[Mesh] PeerJS not initialized");
+    if (!silent) {
+      console.error("[Mesh] PeerJS not initialized");
+      toast.error("Mesh is not ready yet.");
+    }
     return;
   }
   
-  if (connections.has(targetId) || targetId === peer.id) {
-    return; // Already connected or trying to connect to self
+  if (connections.has(targetId) || pendingConnections.has(targetId) || targetId === peer.id) {
+    return; // Already connected or trying to connect
   }
 
-  console.log(`[Mesh] Initiating connection to ${targetId}...`);
+  if (!silent) {
+    console.log(`[Mesh] Initiating connection to ${targetId}...`);
+    toast.loading(`Dialing peer...`, { id: `dial-${targetId}` });
+  }
+  
+  pendingConnections.add(targetId);
   const conn = peer.connect(targetId, {
     reliable: true,
   });
+
+  // Automatically remove from pending after a timeout so it doesn't get stuck forever
+  setTimeout(() => {
+    pendingConnections.delete(targetId);
+    if (!silent && !connections.has(targetId)) {
+      toast.error(`Connection timed out. The peer might be offline or their ID changed.`, { id: `dial-${targetId}` });
+    }
+  }, 10000);
 
   setupConnection(conn);
 }
 
 function setupConnection(conn: DataConnection) {
   conn.on("open", () => {
+    pendingConnections.delete(conn.peer);
+    toast.success(`Connected to Peer!`, { id: `dial-${conn.peer}` });
     console.log(`[Mesh] DataChannel open with ${conn.peer}`);
     connections.set(conn.peer, conn);
     useNetworkStore.getState().setPeerCount(connections.size);
+
+    knownPeers.add(conn.peer);
+    saveKnownPeers();
 
     // Request sync from this new peer
     conn.send(JSON.stringify({ type: "sync_req" }));
@@ -95,12 +172,14 @@ function setupConnection(conn: DataConnection) {
   });
 
   conn.on("close", () => {
+    pendingConnections.delete(conn.peer);
     console.log(`[Mesh] DataChannel closed with ${conn.peer}`);
     connections.delete(conn.peer);
     useNetworkStore.getState().setPeerCount(connections.size);
   });
 
   conn.on("error", (err) => {
+    pendingConnections.delete(conn.peer);
     console.error(`[Mesh] Connection error with ${conn.peer}:`, err);
   });
 }
